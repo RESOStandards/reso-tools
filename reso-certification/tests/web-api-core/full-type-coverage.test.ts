@@ -193,6 +193,43 @@ describe('a type the server provides must be met', () => {
     expect(coverageFails(verdict, false, false)).toBe(false);
   });
 
+  /**
+   * What must not be lost for an MLS (Josh, 2026-11-12): its Property resource carries all six types, so all six are
+   * provided and all six must be met. "The rule for MLSs is still full coverage, if possible, on Core."
+   */
+  it('requires all six types of an MLS whose Property resource carries them, and fails a run that misses one', () => {
+    const properties = [
+      prop('ListingKey', 'Edm.String'),
+      prop('BedroomsTotal', 'Edm.Int32'),
+      prop('ListPrice', 'Edm.Decimal'),
+      prop('ListingContractDate', 'Edm.Date'),
+      prop('ModificationTimestamp', 'Edm.DateTimeOffset'),
+      prop('StandardStatus', 'Edm.String', 'StandardStatus'),
+      prop('InteriorFeatures', 'Collection(Edm.String)', 'InteriorFeatures')
+    ];
+    const records = [
+      {
+        ListingKey: '1',
+        BedroomsTotal: 3,
+        ListPrice: 350000,
+        ListingContractDate: '2026-10-01',
+        ModificationTimestamp: '2026-10-02T00:00:00Z',
+        StandardStatus: 'Active',
+        InteriorFeatures: ['Pantry', 'Elevator']
+      }
+    ];
+    const provided = providedTypesOf(properties, records, enums);
+    expect(provided.map(each => each.type)).toEqual(['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']);
+
+    const coverage = (missing: string): ReadonlyArray<TypeCoverage> =>
+      provided.map(({ type, fields }) => ({ type, field: fields[0], hasData: type !== missing, providedBy: fields }));
+    for (const missing of ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']) {
+      const verdict = typeCoverageOf([report('Property', coverage(missing))]);
+      expect(coverageFails(verdict, false, true), missing).toBe(true);
+    }
+    expect(coverageFails(typeCoverageOf([report('Property', coverage('none'))]), false, true)).toBe(false);
+  });
+
   it('names at most three providing fields in the reason, and counts the rest', () => {
     const verdict = typeCoverageOf([report('Property', metExcept('integer', ['A', 'B', 'C', 'D', 'E']))]);
     expect(coverageFailureReasons(verdict, false)[0]).toContain('Property.A, Property.B, Property.C and 2 more');

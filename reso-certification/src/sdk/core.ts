@@ -124,9 +124,12 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
     const availableResources = requested.filter(r => getEntityType(metadata, r));
     const missingResources = requested.filter(r => !getEntityType(metadata, r));
 
+    // Eligibility is the server's, whatever the run names: what the metadata declares.
+    const lacksCertifyingResource = !declaredResources.some(resource => CERTIFYING_RESOURCES.includes(resource));
     const allErrors = [
       ...validationErrors,
       ...(noReference ? [NO_DD_REFERENCE] : []),
+      ...(lacksCertifyingResource ? [NO_CERTIFYING_RESOURCE] : []),
       ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : [])
     ];
     const selection = ctx.resourcesNamed
@@ -147,7 +150,7 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
       summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${selection}. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
       ...(allErrors.length > 0 ? { errors: allErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid || noReference ? { status: 'failed' as const } : {})
+      ...(!validation.xsdValid || !validation.semanticValid || noReference || lacksCertifyingResource ? { status: 'failed' as const } : {})
     };
   }
 });
@@ -311,6 +314,19 @@ const CERTIFIED_ON_SERVED = 'A system can only be certified on records it serves
 /** Why a run that named no resources has none to test when the Data Dictionary reference does not load. */
 export const NO_DD_REFERENCE =
   'The Data Dictionary reference could not be loaded, so the RESO resources to test are not known. Name the resources to test.';
+
+/**
+ * Core specification Section 3.2: "Web API Servers MUST expose at least one Property, Member, Office, Media, or
+ * InternetTracking Data Dictionary resource in order to be certified." That is eligibility, separate from which resources
+ * are tested (Josh, 2026-11-12: "the server just MUST have at least one of those resources, but those aren't the only
+ * ones we test"). Before every RESO resource was tested by default, the six-resource default happened to stop a server
+ * with none of these, by testing nothing; the rule is now checked by name.
+ */
+export const CERTIFYING_RESOURCES: ReadonlyArray<string> = ['Property', 'Member', 'Office', 'Media', 'InternetTracking'];
+
+/** Why a server with none of the CERTIFYING_RESOURCES cannot be certified, in the words the provider sees. */
+export const NO_CERTIFYING_RESOURCE =
+  'Web API Core certification requires the server to expose at least one Property, Member, Office, Media or InternetTracking resource (Section 3.2 of the specification), and its metadata declares none. Every RESO resource it declares is still tested.';
 
 /** The resources a server declares at the top level: its EntitySets, else (no EntityContainer) its EntityTypes. */
 export const declaredResourcesOf = (metadata: ParsedMetadata): ReadonlyArray<string> =>

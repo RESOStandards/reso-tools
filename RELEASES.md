@@ -46,6 +46,9 @@
   missing types the server provides in `typeCoverage.providedNotMet`.
 - **`--full-coverage` is the strict mode:** every type must be met, none excused. With one resource named, it tests as
   Core 2.0.0 did.
+- **Section 3.2 is checked:** a server must expose at least one Property, Member, Office, Media or InternetTracking
+  resource to be certified. A server with none is still tested on every RESO resource it declares, and the run says
+  why it cannot be certified. Before, the six-resource default stopped such a server only by testing nothing.
 - **A run with nothing to request says why:** "No resource returned any records" now names the cause when the metadata
   declares none of the resources the run asks for, and coverage reads "not measured" when no record was tested.
 

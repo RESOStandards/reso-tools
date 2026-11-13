@@ -141,7 +141,9 @@ A type your server provides on no resource tested is recorded as not achieved, a
 certified. When a type you provide is not met, the run fails and names the fields that provide it.
 
 The run tests every Data Dictionary resource your metadata declares. To test fewer, name them with
-`--resources`; to test a local resource, name it too.
+`--resources`; to test a local resource, name it too. To be certified, your server must expose at least one
+Property, Member, Office, Media or InternetTracking resource (Section 3.2 of the specification); which resources
+are tested is separate from that.
 
 Core 2.0.0 testing worked differently: the provider had to have every type on the same resource. Now
 the run looks across all the resources it tested.
