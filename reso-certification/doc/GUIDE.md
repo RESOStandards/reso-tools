@@ -728,7 +728,7 @@ const passed = results.filter((r) => r.result.status === 'passed').length;
 console.log(`${passed} of ${results.length} endorsements passed`);
 ```
 
-This is exactly how the **[RESO desktop app](../reso-desktop-client/)**'s certification UI runs cert in the background while a user watches the progress in real time.
+This is exactly how the **[RESO desktop app](https://tools.reso.org/guides/reso-desktop-client/)**'s certification UI runs cert in the background while a user watches the progress in real time.
 
 ### Using Config Files
 
