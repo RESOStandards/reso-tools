@@ -97,6 +97,7 @@ different thing from the RESO service credentials above.
 | [`restore`](#restore) | Restore to a Cert API: a run's stored results, published as the run would have, or a certification server backup (admin) |
 | [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 | [`ask`](#ask) | Ask RESO's Assistant a question, as yourself (closed beta) |
+| [`analytics compare`](#analytics-compare) | Compare a Data Dictionary run with the run before it: what changed, by how much, better or worse |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
 server). The rest are **per-step utilities** – each does one stage of a run in isolation,
@@ -655,6 +656,46 @@ reso-cert ask --json "What is the format of the variations report?"
 - **Nothing is sent** without an address for the Assistant and a credential.
 - **Exit codes:** 0 answered; 1 the Assistant did not accept the credential, or does not admit the account; 2 anything
   else.
+
+## RESO Analytics
+
+### `analytics compare`
+
+Compare a Data Dictionary run with the run before it: what changed, by how much, and whether each change is better or
+worse. Both runs are read from disk and nothing is sent anywhere. The numbers are the ones the certification site
+shows for the same runs: field and lookup counts and standardization, fields with data, standard field availability,
+records sampled, response times, response size, throughput and schema validation results, across all resources and
+for each one.
+
+```bash
+reso-cert analytics compare .reso-cert/data-dictionary-2.1/<providerUoi>-<providerUsi>/<recipientUoi>/current
+reso-cert analytics compare <run> <previous-run>             # any two run directories
+reso-cert analytics compare <run> --json                     # the whole comparison, for scripts and agents
+```
+
+| Argument or option | Meaning |
+|---|---|
+| `<run>` | The run to look at: `…/current`, `…/archived/<timestamp>`, or any directory holding a run's reports. |
+| `[previous]` | The run to compare it with. Default: the previous run of the same connection, the newest one under `…/archived` older than `<run>`. |
+| `--all` | Show every metric for every resource, not only the ones that changed. |
+| `--json` | Print the whole comparison as one JSON object, with `schemaVersion` 1. |
+
+- **How changes are stated:** a rate in points (61.0% to 66.0% is "up 5.0 points"), performance and size in percent
+  ("12.0% faster"), a count as a difference ("up 31"). Every line ends with its verdict: better, worse, changed
+  (neither better nor worse, such as more local fields), same, new or gone.
+- **Timings vary from run to run.** A response time, size or throughput within 5% of the previous run's counts as the
+  same; the line still says how far it moved.
+- **Read the notes.** Runs of different Data Dictionary versions, for different connections, or one without a data
+  availability report (a run whose payloads failed schema validation writes the errors report instead) are compared,
+  and the notes at the end say what that means for the numbers.
+- **For AI agents:** the text states every unit and direction in words, so it reads without parsing. `--json` gives the
+  same comparison whole: `before` and `after` (each run's path, version, date and connection), `comparable`, `notes`,
+  `summary` and `changes`, each with a stable `id`, its `scope` (`*` for all resources, or the resource), `before`,
+  `after`, `change`, `unit` and `verdict`.
+- **Exit codes:** 0 compared; 1 there is no earlier run to compare with; 2 anything else, such as a directory with no
+  Data Dictionary run.
+
+The RESO desktop app shows the same comparison from a run's **Compare** button.
 
 ## Variations review (read-only)
 

@@ -4,6 +4,20 @@
 
 ## Unreleased
 
+### Compare a run with the one before it (RESO Analytics)
+
+- **`reso-cert analytics compare <run> [previous]`** compares a Data Dictionary run with the run before it: field and
+  lookup standardization, fields with data, standard field availability, records sampled, response times, response
+  size, throughput and schema validation results, across all resources and for each one. The counts and availability
+  are the ones the certification site shows for the same runs. Without a second run it compares with the previous run
+  of the same connection, from `…/archived`. Both runs are read from disk; nothing is sent.
+- Rates change in points, performance and size in percent, and a timing within 5% of the previous run's counts as the
+  same. Each line ends with its verdict: better, worse, changed, same, new or gone.
+- `--json` prints the whole comparison (`schemaVersion` 1) for scripts and AI agents; `--all` shows every metric of every
+  resource. Exit codes: 0 compared, 1 no earlier run, 2 anything else.
+- **SDK:** `readRunMetrics`, `compareRunMetrics`, `compareRuns`, `findPreviousRun` and `renderComparisonText`, so another
+  tool can show the same comparison. The RESO desktop app's Compare page uses them.
+
 ### Ask RESO's Assistant from the command line
 
 - **`reso-cert ask`** sends a question to RESO's Assistant with the credential in your `credentials.env`, shows the

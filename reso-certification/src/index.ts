@@ -247,3 +247,35 @@ export type { FetchMetadataReportFromServerInput } from './sdk/metadata-source.j
 // ── Data Dictionary (stub) ──
 
 export { DATA_DICTIONARY_VERSION } from './data-dictionary/index.js';
+
+// ── RESO Analytics (compare two runs) ──
+
+export {
+  ALL_RESOURCES,
+  COMPARISON_SCHEMA_VERSION,
+  METRIC_DEFINITIONS,
+  TIMING_TOLERANCE_PERCENT,
+  compareRunMetrics,
+  compareRuns,
+  findPreviousRun,
+  formatChange,
+  formatValue,
+  isNoPreviousRunError,
+  readRunMetrics,
+  renderComparisonText,
+  runMetricsFromReports,
+  runPlacement
+} from './analytics/index.js';
+export type {
+  ChangeUnit,
+  ChangeVerdict,
+  Metric,
+  MetricChange,
+  MetricDirection,
+  MetricKind,
+  RenderOptions,
+  RunComparison,
+  RunInfo,
+  RunMetrics,
+  RunReports
+} from './analytics/index.js';
