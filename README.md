@@ -48,7 +48,7 @@ docker compose --profile seed up seed
 
 ### Desktop Certification App
 
-A cross-platform desktop app (macOS, Windows, Linux) runs the full certification suite – Data Dictionary, Web API Core, Add/Edit, EntityEvent – against any OData server, with a bundled reference server and browser UI for local test data. It is built separately, consuming the public packages above from npm, and published here as a downloadable build.
+A cross-platform desktop app (macOS, Windows, Linux) runs the full certification suite – Data Dictionary, Web API Core, Add/Edit and EntityEvent against any OData server, and RESO Common Format against files of records – with a bundled reference server and browser UI for local test data. The **[user guide](https://tools.reso.org/guides/reso-desktop-client/)** walks through it. It is built separately, consuming the public packages above from npm, and published here as a downloadable build.
 
 | Platform | Download | Roll back one version | Notes |
 |---|---|---|---|

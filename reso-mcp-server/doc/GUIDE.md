@@ -557,8 +557,12 @@ EntityEvent is a RESO resource holding one numbered entry per change, each namin
 
 ### The Certification Tools
 
-In certification mode the server also exposes the RESO certification test runner and the metadata report generator. These are the same tools RESO uses to certify a server, so implementers can run them against their own work while they build rather than finding out at certification time.
+In certification mode the server also exposes the RESO certification test runner and the metadata report generator. These are the same tools RESO uses to certify a server, so implementers can run them against their own work while they build rather than finding out at certification time. A test run's answer carries the certification verdict beside its status and says where its reports were written.
 
 ### About These Examples
 
 Every number above came from a real query against a seeded sample server, not a live market. The sample includes a preferred photo stored as a spreadsheet, a listing and its verification record naming different certifications, and flooring listed as both concrete and "Varies". Tool calls are shown to see how the MCP server translates natural language into RESO Web API queries. 
+
+---
+
+For questions or to join RESO, contact support+tools@reso.org.

@@ -29,7 +29,7 @@ The RESO MCP server offers 10 tools.
 | `delete` | Removes a record | `deleteEntity` |
 | `metadata` | Fetches and parses the server's schema | `fetchMetadata`, `parseMetadataXml` |
 | `parse-filter` | Explains an OData `$filter` expression | `parseFilter` |
-| `validate` | Validates a record according to a server's business rules | RESO Validation Expressions (Coming Soon) |
+| `validate` | A stub for now: it answers `checked: false` and validates nothing | RESO Validation Expressions (Coming Soon) |
 | `run-compliance` | Runs certification tests | `runComplianceTests` |
 | `metadata-report` | Builds a metadata report | `generateMetadataReport` |
 

@@ -230,3 +230,7 @@ For more on the design, the v1/v2/v3 progression and the dependencies on grammar
 * **[RCP-19 spec](https://github.com/RESOStandards/transport/blob/main/proposals/validation-expressions.md)** – the canonical RESO Web API Validation Expressions specification, ratified December 2023
 * **[RCP-19 grammar](https://github.com/RESOStandards/transport/tree/main/artifacts/grammars/rcp-19)** – the canonical ANTLR4 grammar that the v1 implementation is built from
 * **[reso-tools#107](https://github.com/RESOStandards/reso-tools/issues/107)** – the v1 RCP-19 interpreter ticket, with the full v1/v2/v3 progression
+
+---
+
+For questions or to join RESO, contact support+tools@reso.org.
