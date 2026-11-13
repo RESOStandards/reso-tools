@@ -7,9 +7,8 @@
  * values that contain printable punctuation. Renders as a diamond
  * glyph in dev tools and the AWS console.
  *
- * Mirrored on the backend in
- * `reso-services-v2/src/variations-review/index.ts` — keep the
- * separator and shape in sync.
+ * RESO's Variations Service builds the same key, so the separator and
+ * shape must stay the same on both sides.
  */
 
 export const VARIATION_KEY_SEP = '';

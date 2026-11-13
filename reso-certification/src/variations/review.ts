@@ -1,7 +1,7 @@
 /**
  * Variations review — the read side of the review pool.
  *
- * Two GETs against reso-services-v2, the same routes the web client's review
+ * Two GETs against RESO's services, the same routes the web client's review
  * page uses, so the CLI and the UI read one source:
  *  - `GET /v2/certification/variations-review-items` — the items in review,
  *    provider-scoped for a provider token, org-wide for an admin token; paged
