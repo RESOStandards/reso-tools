@@ -357,7 +357,21 @@ export const createDetailedReportGenerator = (
     // Web API Core: whether every data type was met, so a certification can say "Full Type Coverage Achieved" or "Could
     // Not Be Achieved" (Josh, 2026-11-03). Here and not in `report.json`, whose key set the Cert API pins.
     const coverageMatrix = ctx.coverageMatrix as
-      | { readonly coveredTypes: ReadonlyArray<string>; readonly missingTypes: ReadonlyArray<string>; readonly fullCoverage: boolean }
+      | {
+          readonly coveredTypes: ReadonlyArray<string>;
+          readonly missingTypes: ReadonlyArray<string>;
+          readonly fullCoverage: boolean;
+          readonly declaredNotMet?: ReadonlyArray<{
+            readonly type: string;
+            readonly fields: ReadonlyArray<{ readonly field: string; readonly populated?: number; readonly sampled?: number }>;
+          }>;
+          readonly testsNotPassed?: ReadonlyArray<{
+            readonly type: string;
+            readonly tag: string;
+            readonly name: string;
+            readonly reason: string;
+          }>;
+        }
       | undefined;
 
     return {
@@ -371,7 +385,12 @@ export const createDetailedReportGenerator = (
             typeCoverage: {
               achieved: coverageMatrix.fullCoverage,
               coveredTypes: coverageMatrix.coveredTypes,
-              missingTypes: coverageMatrix.missingTypes
+              missingTypes: coverageMatrix.missingTypes,
+              // Missing types the server declares, with the fields to name for them, most populated first: each one
+              // fails the run until the server names a field. A type it never declares is not required.
+              declaredNotMet: coverageMatrix.declaredNotMet ?? [],
+              // Required tests of a type the server has that passed on no resource tested: each fails the run.
+              testsNotPassed: coverageMatrix.testsNotPassed ?? []
             }
           }
         : {}),

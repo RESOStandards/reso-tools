@@ -135,12 +135,22 @@ on some field of some resource it tested. A single-valued lookup is met with one
 multi-valued lookup with two, as the specification gives them. Every run records whether it achieved
 full type coverage, in `report-detailed.json` as `typeCoverage`.
 
-Core 2.0.0 testing worked differently: the provider had to have every type on the same resource. Now
-the run looks across all the resources it tested. A server that cannot meet every type in its standard
-or local fields is recorded as not having achieved full type coverage, and can still be certified.
+All data types are required for Web API Core when your server has them, whether in standard or local
+fields. A type your metadata declares must be met and its tests must pass. The run looks for a field it
+can sample for each type; when it cannot find one for a type you declare, the run fails, and the reason
+lists your most populated fields of that type so you can name one with `--field-overrides`. A type your
+metadata never declares is not required.
 
-To test as Core 2.0.0 did, name the resource and require full type coverage. With `--full-coverage`, a
-type that is not met fails the run. Add `--spec-version 2.0.0` to run the 2.0.0 tests themselves rather
+The run tests every Data Dictionary resource your metadata declares. To test fewer, name them with
+`--resources`; to test a local resource, name it too. To be certified, your server must expose at least one
+Property, Member, Office, Media or InternetTracking resource (Section 3.2 of the specification); which resources
+are tested is separate from that.
+
+Core 2.0.0 testing worked differently: the provider had to have every type on the same resource. Now
+the run looks across all the resources it tested.
+
+To test as Core 2.0.0 did, name the resource and require full type coverage. With `--full-coverage`, any
+type that is not met fails the run, whether or not your server provides it. Add `--spec-version 2.0.0` to run the 2.0.0 tests themselves rather
 than 2.1.0's:
 
 ```bash

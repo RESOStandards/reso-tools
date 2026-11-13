@@ -5,16 +5,16 @@ Validates OData query capabilities against the [RESO Web API Core specification]
 ## Usage
 
 ```bash
-# Test all well-known resources
+# Test every Data Dictionary resource the server declares
 reso-cert core --url https://api.example.com --auth-token TOKEN
 
-# Specific resources
+# Specific resources, local ones included
 reso-cert core --url https://api.example.com --auth-token TOKEN --resources Property,Member
 
 # Version 2.1.0
 reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 
-# Require full data type coverage
+# Require every data type, with none excused (Core 2.0.0 parity, with one resource named)
 reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage
 ```
 
@@ -162,16 +162,25 @@ Office:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  mul
 Full type coverage means each of the six types is met on some field of some resource tested. No resource has to carry
 all six. A single-valued lookup is met with one sampled value and a multi-valued lookup with two, as the specification
 gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
-goes to the next field, and with none left the type is not met. A server that cannot meet every type in its standard or local fields is recorded as not having achieved full
-type coverage, and can still be certified.
+goes to the next field, and with none left the type is not met.
+
+All data types are required for Web API Core when the server has them, whether in standard or local fields. A type the
+metadata declares, on any resource, must be met and its required tests must pass. When the run cannot sample a field for
+a declared type, it fails and lists the most populated fields of that type, so the provider can name one with
+`--field-overrides`; a field on a resource the run did not test is listed with a note to name the resource. A type the
+metadata never declares is not required. Which types the server declares is read from the metadata alone, independent
+of field selection, so a type selection missed still fails the run. A test that does not apply to the server (another
+lookup representation, `in` on OData 4.0) is not counted against it.
 
 Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
 name the fields from your 2.0.0 report with `--field-overrides`. The key field and the values tested stay the run's own
 (see the [User Guide](https://tools.reso.org/guides/reso-certification/#web-api-core-210)).
 
 - **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
-  (`achieved`, `coveredTypes`, `missingTypes`), and in the run's summary. A run passes as long as no scenario fails.
-- **`--full-coverage`**: a missing type fails the run too.
+  (`achieved`, `coveredTypes`, `missingTypes`, `declaredNotMet` with the fields to name for each missing declared type,
+  and `testsNotPassed`), and in the run's summary.
+- **By default**, a missing declared type, or a required test of a met type that did not pass, fails the run.
+- **`--full-coverage`**: any missing type fails the run, declared or not.
 
 ## Report Format
 

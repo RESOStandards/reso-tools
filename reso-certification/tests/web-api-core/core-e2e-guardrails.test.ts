@@ -67,12 +67,20 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
 
     const result = await runCoreCompliance(makeConfig(outputDir));
     const detailed = JSON.parse(await readFile(join(result.context.outputPath, 'report-detailed.json'), 'utf-8'));
-    const matrix = result.context.coverageMatrix as { coveredTypes: string[]; missingTypes: string[]; fullCoverage: boolean };
+    const matrix = result.context.coverageMatrix as {
+      coveredTypes: string[];
+      missingTypes: string[];
+      fullCoverage: boolean;
+      declaredNotMet: ReadonlyArray<unknown>;
+      testsNotPassed: ReadonlyArray<unknown>;
+    };
 
     expect(detailed.typeCoverage).toEqual({
       achieved: matrix.fullCoverage,
       coveredTypes: matrix.coveredTypes,
-      missingTypes: matrix.missingTypes
+      missingTypes: matrix.missingTypes,
+      declaredNotMet: matrix.declaredNotMet,
+      testsNotPassed: matrix.testsNotPassed
     });
     expect([...detailed.typeCoverage.coveredTypes, ...detailed.typeCoverage.missingTypes].sort()).toEqual([
       'date',

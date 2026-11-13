@@ -56,6 +56,7 @@ import { normalizeReportFieldTypes } from '../sdk/report-field-types.js';
 import { withSoftwareVersion } from '../sdk/reports.js';
 import type { AddEditConfig, CoreConfig, DDConfig, EntityEventConfig, PipelineResult, RcfConfig } from '../sdk/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
+import { applyVariationDecisionsViaService } from '../variations/apply.js';
 import {
   DEFAULT_DD_VERSION,
   DEFAULT_FUZZINESS,
@@ -75,6 +76,7 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
+import { formatApplyItems, summarizeApplyPlan } from './apply-command.js';
 import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
 import { mintOAuth2ClientCredentialsToken, resolveCliAuth } from './auth.js';
 import { resolveCertApiAuthorization, resolveCertApiOrigin } from './cert-api-credential.js';
@@ -640,7 +642,7 @@ const coreCmd = program
   .description('Web API Core 2.0.0/2.1.0 compliance testing')
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file – runs every entry (mutually exclusive with --url)')
-  .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
+  .option('--resources <list>', 'Comma-separated resource names (default: every Data Dictionary resource the server declares)')
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
   .option(
@@ -654,7 +656,7 @@ const coreCmd = program
   )
   .option(
     '--full-coverage',
-    'Fail if any data type is met on no resource tested. Without it, the detailed report still records whether full type coverage was achieved'
+    'Fail if any data type is met on no resource tested, the strict mode for Core 2.0.0 parity. Without it, every type the server declares must still be met and pass, and a type it never declares is not required'
   )
   .option(
     '--save-payloads <dir>',
@@ -2099,6 +2101,98 @@ program
       process.exitCode = 2;
     }
   });
+
+program
+  .command('apply-variation-decisions')
+  .description(
+    "RESO staff: apply a sheet of actions and comments to a variations report that is already under review, as a merge. Only the sheet's items change; everything else on the review stays as it is"
+  )
+  .requiredOption('--provider-uoi <uoi>', 'The provider the report is about (UOI)')
+  .requiredOption('--provider-usi <usi>', 'The system the report was run against (USI)')
+  .requiredOption('--recipient-uoi <uoi>', 'The organization the report is for (UOI)')
+  .option('--dd-version <version>', 'The Data Dictionary version of the report', CURRENT_DD_VERSION)
+  .requiredOption(
+    '-d, --decisions <path>',
+    'The sheet: Resource Name, Field Name, Lookup Value, Action, Comment (list-variation-reviews --csv writes one)'
+  )
+  .option('--dry-run', 'Show what would change and send nothing')
+  .option('--json', 'Print the plan as JSON')
+  .action(
+    async (opts: {
+      providerUoi: string;
+      providerUsi: string;
+      recipientUoi: string;
+      ddVersion: string;
+      decisions: string;
+      dryRun?: boolean;
+      json?: boolean;
+    }) => {
+      try {
+        const sheet = parseDecisionsCsv(await readFile(resolve(opts.decisions), 'utf-8'));
+        if (sheet.skippedColumns.length) console.error(`Ignoring unrecognized columns: ${sheet.skippedColumns.join(', ')}`);
+        if (sheet.undecidedRows.length) {
+          console.error(
+            `${sheet.undecidedRows.length} row(s) carry no Action or Comment and are left as they are: ${sheet.undecidedRows.join(', ')}`
+          );
+        }
+        console.log(`Parsed ${sheet.items.length} row(s) from columns: ${sheet.recognizedColumns.join(', ')}.`);
+        const coordinates = {
+          version: opts.ddVersion,
+          providerUoi: opts.providerUoi,
+          providerUsi: opts.providerUsi,
+          recipientUoi: opts.recipientUoi
+        };
+        const bearerToken = await mintOAuth2ClientCredentialsToken();
+        const { plan, sent, mismatches } = await applyVariationDecisionsViaService({
+          coordinates,
+          rows: sheet.items,
+          fromCli: true,
+          ...(opts.dryRun ? { dryRun: true } : {}),
+          ...(bearerToken ? { bearerToken } : {})
+        });
+        const where = `${opts.providerUoi} / ${opts.providerUsi} → ${opts.recipientUoi}, DD ${opts.ddVersion}`;
+        if (plan.errors.length > 0) {
+          console.error(`The sheet has ${plan.errors.length} unusable row(s). Nothing was sent.`);
+          for (const error of plan.errors) console.error(`  • ${error}`);
+          process.exitCode = 2;
+          return;
+        }
+        if (opts.json) console.log(JSON.stringify(plan, null, 2));
+        if (plan.unchanged.length) console.log(`Already as the sheet says (${plan.unchanged.length}): ${plan.unchanged.join('; ')}`);
+        for (const warning of plan.warnings) console.log(`Note: ${warning}`);
+        if (plan.items.length === 0) {
+          console.log(`Nothing to change on ${where}.`);
+          return;
+        }
+        console.log(`${summarizeApplyPlan(plan)} Report: ${where}.`);
+        console.log(formatApplyItems(plan));
+        if (!sent) {
+          console.log('Dry run: nothing was sent. The save is a merge: it changes only these items. Rerun without --dry-run to send it.');
+          return;
+        }
+        if (mismatches.length > 0) {
+          console.error(`Saved, but ${mismatches.length} item(s) do not show what was sent:`);
+          for (const mismatch of mismatches) console.error(`  • ${mismatch}`);
+          process.exitCode = 2;
+          return;
+        }
+        console.log('Saved as one merge, and read back: every item shows what was sent, in the report and in the review pool.');
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        console.error(error instanceof Error ? error.message : String(error));
+        if (code === 'LOCKED') {
+          const lock = lockHolderOf(error);
+          if (lock) {
+            console.error(`  Held by: ${lock.displayName} <${lock.email}>`);
+            console.error(`  Until:   ${lock.expiresAt}`);
+          }
+          process.exitCode = 3;
+          return;
+        }
+        process.exitCode = 2;
+      }
+    }
+  );
 
 program
   .command('restore')

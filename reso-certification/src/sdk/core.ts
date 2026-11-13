@@ -12,23 +12,20 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { createCapturingRequester } from '../test-runner/payload-capture.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
+import type { ParsedMetadata } from '../test-runner/types.js';
+import { declaredTypesOf } from '../web-api-core/declared-types.js';
 import { type FieldOverrideSummary, parseFieldOverrides, summarizeFieldOverrides } from '../web-api-core/field-override.js';
-import {
-  NO_KEY_DECLARED,
-  NO_RECORDS_SAMPLED,
-  WELL_KNOWN_RESOURCES,
-  buildStandardMap,
-  createLookupCache,
-  resolveTestParams
-} from '../web-api-core/index.js';
+import { NO_KEY_DECLARED, NO_RECORDS_SAMPLED, buildStandardMap, createLookupCache, resolveTestParams } from '../web-api-core/index.js';
+import { scenariosForVersion } from '../web-api-core/scenarios.js';
 import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
+import { ddResourcesFor } from '../web-api-core/standard-map.js';
 import {
   type ResourceTestReport,
   runCoreResourceScenarios,
   runProviderScenarios,
   summarizeScenarios
 } from '../web-api-core/test-runner.js';
-import { typeCoverageOf } from '../web-api-core/type-coverage.js';
+import { coverageFails, coverageFailureReasons, typeCoverageOf } from '../web-api-core/type-coverage.js';
 import { RECORDS_TESTED, allOf, everyStepPassed, testedAtLeastOneRecord, versionCertifies } from './certification.js';
 import { coerceCoreVersion, isCore21OrLater, whyCoreVersionDoesNotCertify } from './core-versions.js';
 import { createExpandSchemaValidator, isEnumerationIgnored, loadValidationConfig } from './expand-schema.js';
@@ -45,6 +42,12 @@ interface CoreContext extends BaseTestContext {
   readonly version: '2.0.0' | '2.1.0';
   readonly enumMode: 'auto' | 'isflags' | 'collections' | 'string';
   readonly resources: ReadonlyArray<string>;
+  /** Whether the run named its resources. When it did not, the fetch step chooses them from the metadata. */
+  readonly resourcesNamed?: boolean;
+  /** Every resource the server declares at the top level, for the reasons a run gives. Set by the fetch step. */
+  readonly declaredResources?: ReadonlyArray<string>;
+  /** The resources the run asked for that the metadata does not declare. Set by the fetch step. */
+  readonly resourcesNotInMetadata?: ReadonlyArray<string>;
   readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
   /** Field-selection overrides for this run: requested, applied, what matched nothing, and what was not
    *  well-formed. Recorded because an override changes WHAT WAS TESTED, so a reviewer has to be able to see
@@ -110,21 +113,46 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
     const validation = await validateMetadata(metadataXml);
     const validationErrors = collectValidationErrors(validation);
 
-    // Check which requested resources exist in metadata
-    const availableResources = ctx.resources.filter(r => getEntityType(metadata, r));
-    const missingResources = ctx.resources.filter(r => !getEntityType(metadata, r));
+    // The resources to test (Josh, 2026-11-12): the ones the run names, else every resource the server declares that
+    // the Data Dictionary defines. "It should be every RESO resource, we can't expect their local ones to be
+    // compliant", and a provider may name a subset: "anyone can choose a subset anyway". Before, a run that named none
+    // tested six listing resources, and a server serving none of those was asked for nothing.
+    const declaredResources = declaredResourcesOf(metadata);
+    const ddResources = ctx.resourcesNamed ? undefined : ddResourcesFor(ctx.version);
+    const noReference = !ctx.resourcesNamed && ddResources === undefined;
+    const isDdResource = (resource: string): boolean => ddResources?.has(resource) ?? false;
+    const requested = ctx.resourcesNamed ? ctx.resources : declaredResources.filter(isDdResource);
+    const leftOut = ctx.resourcesNamed ? [] : declaredResources.filter(resource => !isDdResource(resource));
+    const availableResources = requested.filter(r => getEntityType(metadata, r));
+    const missingResources = requested.filter(r => !getEntityType(metadata, r));
 
+    // Eligibility is the server's, whatever the run names: what the metadata declares.
+    const lacksCertifyingResource = !declaredResources.some(resource => CERTIFYING_RESOURCES.includes(resource));
     const allErrors = [
       ...validationErrors,
+      ...(noReference ? [NO_DD_REFERENCE] : []),
+      ...(lacksCertifyingResource ? [NO_CERTIFYING_RESOURCE] : []),
       ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : [])
     ];
+    const selection = ctx.resourcesNamed
+      ? `${availableResources.length}/${requested.length} resources available`
+      : `testing the ${availableResources.length} RESO resources it declares${
+          leftOut.length > 0 ? `, not ${leftOut.join(', ')}, which the Data Dictionary does not define (name them to test them)` : ''
+        }`;
 
     return {
-      context: { ...ctx, metadataXml, resources: availableResources, metadata },
-      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${availableResources.length}/${ctx.resources.length} resources available. ${formatValidationSummary(validation)}`,
+      context: {
+        ...ctx,
+        metadataXml,
+        resources: availableResources,
+        metadata,
+        declaredResources,
+        resourcesNotInMetadata: missingResources
+      },
+      summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${selection}. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
       ...(allErrors.length > 0 ? { errors: allErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid ? { status: 'failed' as const } : {})
+      ...(!validation.xsdValid || !validation.semanticValid || noReference || lacksCertifyingResource ? { status: 'failed' as const } : {})
     };
   }
 });
@@ -282,6 +310,49 @@ export const notServedNotApplicableReport = (resource: string): ResourceTestRepo
 /** Why a Web API Core run that sampled no records failed, in the words the provider sees. */
 export const NO_RESOURCE_RECORDS =
   'No resource returned any records, so no scenario was tested on a record. A system can only be certified on records it serves.';
+
+const CERTIFIED_ON_SERVED = 'A system can only be certified on records it serves.';
+
+/** Why a run that named no resources has none to test when the Data Dictionary reference does not load. */
+export const NO_DD_REFERENCE =
+  'The Data Dictionary reference could not be loaded, so the RESO resources to test are not known. Name the resources to test.';
+
+/**
+ * Core specification Section 3.2: "Web API Servers MUST expose at least one Property, Member, Office, Media, or
+ * InternetTracking Data Dictionary resource in order to be certified." That is eligibility, separate from which resources
+ * are tested (Josh, 2026-11-12: "the server just MUST have at least one of those resources, but those aren't the only
+ * ones we test"). Before every RESO resource was tested by default, the six-resource default happened to stop a server
+ * with none of these, by testing nothing; the rule is now checked by name.
+ */
+export const CERTIFYING_RESOURCES: ReadonlyArray<string> = ['Property', 'Member', 'Office', 'Media', 'InternetTracking'];
+
+/** Why a server with none of the CERTIFYING_RESOURCES cannot be certified, in the words the provider sees. */
+export const NO_CERTIFYING_RESOURCE =
+  'Web API Core certification requires the server to expose at least one Property, Member, Office, Media or InternetTracking resource (Section 3.2 of the specification), and its metadata declares none. Every RESO resource it declares is still tested.';
+
+/** The resources a server declares at the top level: its EntitySets, else (no EntityContainer) its EntityTypes. */
+export const declaredResourcesOf = (metadata: ParsedMetadata): ReadonlyArray<string> =>
+  metadata.entitySets && metadata.entitySets.length > 0
+    ? metadata.entitySets.map(set => set.name)
+    : metadata.entityTypes.map(type => type.name);
+
+/**
+ * Why a run sampled no records, naming the cause when it is that nothing could be requested. A run that asked for
+ * nothing read before as a server that served nothing ("No resource returned any records"), with the cause left on a
+ * step that passed (RESO's own Web API, 2026-11-12).
+ */
+export const noRecordsReason = (ctx: {
+  readonly resources: ReadonlyArray<string>;
+  readonly resourcesNamed?: boolean;
+  readonly declaredResources?: ReadonlyArray<string>;
+  readonly resourcesNotInMetadata?: ReadonlyArray<string>;
+}): string => {
+  if (ctx.resources.length > 0) return NO_RESOURCE_RECORDS;
+  const declared = ctx.declaredResources && ctx.declaredResources.length > 0 ? ctx.declaredResources.join(', ') : 'none';
+  return ctx.resourcesNamed
+    ? `None of the resources named for this run is in the server's metadata (${(ctx.resourcesNotInMetadata ?? []).join(', ')}), so no records were requested. Resources the metadata declares: ${declared}. ${CERTIFIED_ON_SERVED}`
+    : `The server's metadata declares no Data Dictionary resource, so no records were requested. Resources it declares: ${declared}. Name the resources to test. ${CERTIFIED_ON_SERVED}`;
+};
 
 /**
  * The Core run verdict from the aggregate counts — the single source of truth for the run's
@@ -690,13 +761,6 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // never folded into totalFailed or the verdict.
     const totalWarnings = resourceReports.reduce((sum, r) => sum + (r.summary.warnings ?? 0), 0);
 
-    // Full type coverage: each type met on some resource tested. Every run records it; it decides the outcome only in
-    // --full-coverage mode.
-    const { coveredTypes, missingTypes, fullCoverage } = typeCoverageOf(resourceReports);
-
-    // In --full-coverage mode, fail if any types are missing
-    const requireFullCoverage = config.fullCoverage ?? false;
-    const coverageFailed = requireFullCoverage && !fullCoverage;
     // Verdict precedence (see coreVerdict): a real failure (scenario or coverage gate) is
     // definitive and outranks an incomplete (deadline-truncated) run, which outranks passed.
     // A run that ran out of time is `incomplete` only if it observed no real failure.
@@ -708,6 +772,28 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // step's failure as a failed prior step, so the report and the step still agree.
     const recordsSampled = resourceReports.reduce((sum, r) => sum + (r.params.sampleRecordCount ?? 0), 0);
     const noRecords = recordsSampled === 0 && !deadlineReached;
+    // Full type coverage (type-coverage.ts): each type met on some resource tested. A type the server provides and the
+    // run met nowhere fails it; with --full-coverage, any missing type does. A run that tested no record measured
+    // nothing, and fails on that instead.
+    // Types are seen across every element the server declares, standard and local (Josh, 2026-11-12: "but that's across
+    // all standard and local elements"; "we must never have seen them"). A resource the run did not test (a local one
+    // left out, or one a narrowed run did not name) has no sample, so its declared types can only be named. A resource
+    // tested that returned no records is Not Applicable under the serving rules, and adds none.
+    const parsedMetadata = ctx.metadata as ParsedMetadata | undefined;
+    const testedResources = new Set(resourceReports.map(r => r.resource));
+    const unsampled = parsedMetadata
+      ? (ctx.declaredResources ?? [])
+          .filter(resource => !testedResources.has(resource))
+          .flatMap(resource => {
+            const entityType = getEntityType(parsedMetadata, resource);
+            return entityType ? [{ resource, declared: declaredTypesOf(entityType.properties, [], parsedMetadata.enumTypes) }] : [];
+          })
+      : [];
+    const coverage = typeCoverageOf(resourceReports, scenariosForVersion(ctx.version), unsampled);
+    const { coveredTypes, missingTypes, fullCoverage } = coverage;
+    const requireFullCoverage = config.fullCoverage ?? false;
+    const coverageFailed = coverageFails(coverage, requireFullCoverage, recordsSampled > 0);
+    const notDeclared = missingTypes.filter(type => !coverage.declaredNotMet.some(each => each.type === type));
     const status = noRecords ? ('failed' as const) : coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
     // An override that matched no candidate on any resource changed nothing. Say so out loud rather than
@@ -761,7 +847,15 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           .join('; ')
       : '';
 
-    const coverageMsg = fullCoverage ? 'Full type coverage achieved' : `Missing coverage: ${missingTypes.join(', ')}`;
+    const coverageMsg =
+      recordsSampled === 0
+        ? 'Type coverage was not measured: no records were tested'
+        : fullCoverage
+          ? 'Full type coverage achieved'
+          : `Missing coverage: ${missingTypes.join(', ')}${
+              notDeclared.length > 0 ? `; not declared by the server, so not required: ${notDeclared.join(', ')}` : ''
+            }`;
+    const whyNoRecords = noRecords ? noRecordsReason(ctx) : '';
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
     const incompleteMsg = deadlineReached ? 'INCOMPLETE – run deadline reached; remaining resources/scenarios not tested. ' : '';
 
@@ -769,7 +863,14 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       context: {
         ...ctx,
         resourceReports,
-        coverageMatrix: { coveredTypes, missingTypes, fullCoverage },
+        coverageMatrix: {
+          coveredTypes,
+          missingTypes,
+          fullCoverage,
+          declaredNotMet: coverage.declaredNotMet,
+          testsNotPassed: coverage.testsNotPassed,
+          coverageFailed
+        },
         // The OData version the server declared, which the Core report names as the Commander's did.
         ...(provider.odataVersion === undefined ? {} : { odataVersion: provider.odataVersion }),
         // Only when the run was actually overridden, so an automatic report carries no empty key. Reporting the
@@ -780,7 +881,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         ...(overrideSummary ? { fieldOverrides: overrideSummary } : {})
       },
       status,
-      summary: `${noRecords ? `${NO_RESOURCE_RECORDS} ` : ''}${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}${overrideMsg ? `. ${overrideMsg}` : ''}`,
+      summary: `${noRecords ? `${whyNoRecords} ` : ''}${incompleteMsg}${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped${totalWarnings > 0 ? `, ${totalWarnings} warning${totalWarnings === 1 ? '' : 's'}` : ''}${optTotal > 0 ? `; optional: ${optPassed} passed, ${optNotSupported} not supported, ${optNotTested} not tested` : ''} (${totalScenarios} scenarios across ${resourceReports.length} resources). ${coverageMsg}${modeMsg}${overrideMsg ? `. ${overrideMsg}` : ''}`,
       counts: {
         total: totalScenarios,
         passed: totalPassed,
@@ -795,10 +896,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       },
       ...(coverageFailed || noRecords
         ? {
-            errors: [
-              ...(noRecords ? [NO_RESOURCE_RECORDS] : []),
-              ...(coverageFailed ? [`Full coverage required but missing types: ${missingTypes.join(', ')}`] : [])
-            ]
+            errors: [...(noRecords ? [whyNoRecords] : []), ...(coverageFailed ? coverageFailureReasons(coverage, requireFullCoverage) : [])]
           }
         : {})
     };
@@ -827,8 +925,10 @@ const writeComplianceReports = (config: CoreConfig): PipelineStep<CoreContext> =
     // The coverage gate is a run-level check that never shows up in totalFailed, so it is
     // carried explicitly.
     const deadlineReached = resourceReports.some(r => r.deadlineReached);
-    const coverageMatrix = ctx.coverageMatrix as { readonly fullCoverage?: boolean } | undefined;
-    const coverageFailed = (config.fullCoverage ?? false) && !(coverageMatrix?.fullCoverage ?? true);
+    // The scenarios step decided coverage once (coverageFails) and stored it with the matrix, so the report and the step
+    // agree by construction rather than by recomputing the same rule here.
+    const coverageMatrix = ctx.coverageMatrix as { readonly coverageFailed?: boolean } | undefined;
+    const coverageFailed = coverageMatrix?.coverageFailed ?? false;
     const priorSteps = (ctx.pipelineSteps as ReadonlyArray<StepResult>) ?? [];
     const priorStepFailed = priorSteps.some(s => s.status === 'failed');
     const testingAborted = (ctx.resources?.length ?? 0) > 0 && resourceReports.length === 0;
@@ -909,13 +1009,15 @@ export const runCoreCompliance = async (config: CoreConfig, onProgress?: (progre
   const version = coerceCoreVersion(config.version);
   const normalizedConfig: CoreConfig = { ...config, version };
   const pipeline = createCorePipeline(normalizedConfig);
-  const resources = normalizedConfig.resources ?? WELL_KNOWN_RESOURCES.map(r => r.resource);
+  // No resources named: the fetch step tests every RESO resource the metadata declares (see fetchAndParseMetadata).
+  const resourcesNamed = normalizedConfig.resources !== undefined;
   const outputPath = await prepareOutputDir('web-api-core', version, normalizedConfig);
   const initialContext: CoreContext = {
     serverUrl: normalizedConfig.server.url,
     version,
     enumMode: normalizedConfig.enumMode ?? 'auto',
-    resources,
+    resources: normalizedConfig.resources ?? [],
+    resourcesNamed,
     outputPath
   };
 

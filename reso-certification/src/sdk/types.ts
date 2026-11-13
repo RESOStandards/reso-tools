@@ -359,6 +359,8 @@ export interface EntityEventConfig extends BaseComplianceConfig {
 export interface CoreConfig extends BaseComplianceConfig {
   readonly endorsement: 'core';
   readonly version?: '2.0.0' | '2.1.0';
+  /** The resources to test. Omitted: every Data Dictionary resource the server declares. Local resources are tested
+   *  only when named here. */
   readonly resources?: ReadonlyArray<string>;
   readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
   readonly metadataPath?: string;

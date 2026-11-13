@@ -32,6 +32,48 @@
 
 ---
 
+## Certification 0.12.3 – 2026-11-12
+
+### Web API Core tests every Data Dictionary resource, and requires the types the server has
+
+- **Every RESO resource by default:** a run that names no resources tests every resource the server declares that the
+  Data Dictionary defines. Before, it tested six listing resources (Property, Member, Office, Media, OpenHouse, Showing),
+  so resources such as PropertyRooms, Teams or Lookup went untested, and a server serving none of the six was asked for
+  nothing. `--resources` still narrows the run, and a local resource is tested only when named.
+- **All data types are required when the server has them, in standard or local fields:** a type the metadata declares
+  must be met and its required tests must pass. When the run cannot sample a field for a declared type, it fails and
+  lists the most populated fields of that type to name with `--field-overrides`. A type the metadata never declares is
+  not required. Before, a missing type failed the run only with `--full-coverage`. `report-detailed.json` lists them
+  in `typeCoverage.declaredNotMet` and `typeCoverage.testsNotPassed`.
+- **`--full-coverage` is the strict mode:** every type must be met, none excused. With one resource named, it tests as
+  Core 2.0.0 did.
+- **Section 3.2 is checked:** a server must expose at least one Property, Member, Office, Media or InternetTracking
+  resource to be certified. A server with none is still tested on every RESO resource it declares, and the run says
+  why it cannot be certified. Before, the six-resource default stopped such a server only by testing nothing.
+- **A run with nothing to request says why:** "No resource returned any records" now names the cause when the metadata
+  declares none of the resources the run asks for, and coverage reads "not measured" when no record was tested.
+
+### RESO staff can apply review answers from a sheet, as a merge
+
+- **`reso-cert apply-variation-decisions`** applies a sheet of actions and comments (the one
+  `list-variation-reviews --csv` writes) to a variations report that is already under review. Only the items the sheet
+  names change; every other item, comment and decision on the review stays as it was.
+- Every row must name an item on the review, or nothing is sent. `--dry-run` lists each item that would change, the
+  decision it replaces and whether a comment goes with it.
+- Running it twice is safe: an item already as the sheet says is left alone, and a comment already on its thread is not
+  sent again. After the save the review is read back and each item checked.
+- It reads the review pool as well as the report. When an item's report shows the sheet's decision but its pool row does
+  not (a comment-only save elsewhere can clear the pool row), the item is sent again to put the pool row right, and the
+  plan says so.
+
+### Dependencies
+
+- **`fast-xml-parser` 5.12.0** (from 5.11.2), which fixes
+  [GHSA-474x-hrwr-fgx4](https://github.com/advisories/GHSA-474x-hrwr-fgx4), a low-severity advisory: quadratic CPU use
+  while scanning unterminated stop-node tags.
+
+---
+
 ## Documentation release – odata-expression-parser 0.1.2 · reso-validation 0.1.2
 
 Documentation only. The JavaScript in both packages is the same as in 0.1.0.
@@ -47,6 +89,8 @@ locally and links to sibling folders and a guide that do not resolve on npm.
 pages on tools.reso.org. 0.1.1 is skipped on npm.
 
 ---
+
+## Certification 0.12.2 – 2026-11-11
 
 ### Data Dictionary: a larger sample certifies
 
