@@ -13,8 +13,10 @@ import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, p
 import { createCapturingRequester } from '../test-runner/payload-capture.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
 import type { ParsedMetadata } from '../test-runner/types.js';
+import { declaredTypesOf } from '../web-api-core/declared-types.js';
 import { type FieldOverrideSummary, parseFieldOverrides, summarizeFieldOverrides } from '../web-api-core/field-override.js';
 import { NO_KEY_DECLARED, NO_RECORDS_SAMPLED, buildStandardMap, createLookupCache, resolveTestParams } from '../web-api-core/index.js';
+import { scenariosForVersion } from '../web-api-core/scenarios.js';
 import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
 import { ddResourcesFor } from '../web-api-core/standard-map.js';
 import {
@@ -773,11 +775,25 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // Full type coverage (type-coverage.ts): each type met on some resource tested. A type the server provides and the
     // run met nowhere fails it; with --full-coverage, any missing type does. A run that tested no record measured
     // nothing, and fails on that instead.
-    const coverage = typeCoverageOf(resourceReports);
+    // Types are seen across every element the server declares, standard and local (Josh, 2026-11-12: "but that's across
+    // all standard and local elements"; "we must never have seen them"). A resource the run did not test (a local one
+    // left out, or one a narrowed run did not name) has no sample, so its declared types can only be named. A resource
+    // tested that returned no records is Not Applicable under the serving rules, and adds none.
+    const parsedMetadata = ctx.metadata as ParsedMetadata | undefined;
+    const testedResources = new Set(resourceReports.map(r => r.resource));
+    const unsampled = parsedMetadata
+      ? (ctx.declaredResources ?? [])
+          .filter(resource => !testedResources.has(resource))
+          .flatMap(resource => {
+            const entityType = getEntityType(parsedMetadata, resource);
+            return entityType ? [{ resource, declared: declaredTypesOf(entityType.properties, [], parsedMetadata.enumTypes) }] : [];
+          })
+      : [];
+    const coverage = typeCoverageOf(resourceReports, scenariosForVersion(ctx.version), unsampled);
     const { coveredTypes, missingTypes, fullCoverage } = coverage;
     const requireFullCoverage = config.fullCoverage ?? false;
     const coverageFailed = coverageFails(coverage, requireFullCoverage, recordsSampled > 0);
-    const notProvided = missingTypes.filter(type => !coverage.providedNotMet.some(each => each.type === type));
+    const notDeclared = missingTypes.filter(type => !coverage.declaredNotMet.some(each => each.type === type));
     const status = noRecords ? ('failed' as const) : coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
     // An override that matched no candidate on any resource changed nothing. Say so out loud rather than
@@ -837,7 +853,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         : fullCoverage
           ? 'Full type coverage achieved'
           : `Missing coverage: ${missingTypes.join(', ')}${
-              notProvided.length > 0 ? `; not provided on any resource tested: ${notProvided.join(', ')}` : ''
+              notDeclared.length > 0 ? `; not declared by the server, so not required: ${notDeclared.join(', ')}` : ''
             }`;
     const whyNoRecords = noRecords ? noRecordsReason(ctx) : '';
     const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
@@ -847,7 +863,14 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       context: {
         ...ctx,
         resourceReports,
-        coverageMatrix: { coveredTypes, missingTypes, fullCoverage, providedNotMet: coverage.providedNotMet, coverageFailed },
+        coverageMatrix: {
+          coveredTypes,
+          missingTypes,
+          fullCoverage,
+          declaredNotMet: coverage.declaredNotMet,
+          testsNotPassed: coverage.testsNotPassed,
+          coverageFailed
+        },
         // The OData version the server declared, which the Core report names as the Commander's did.
         ...(provider.odataVersion === undefined ? {} : { odataVersion: provider.odataVersion }),
         // Only when the run was actually overridden, so an automatic report carries no empty key. Reporting the

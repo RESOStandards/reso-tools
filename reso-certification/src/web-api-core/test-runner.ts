@@ -23,6 +23,7 @@ import {
   extractNextLink,
   extractRecords
 } from './assertions.js';
+import type { DeclaringField } from './declared-types.js';
 import { type EmptyContext, type EmptyVerdict, emptyVerdict } from './empty-verdict.js';
 import type { EnumCandidate } from './enum-selection.js';
 import { type LookupCache, createLookupCache } from './lookup-cache.js';
@@ -49,6 +50,13 @@ export interface ScenarioResult {
    * passing scenarios.
    */
   readonly skipReason?: string;
+  /**
+   * Why a skip does not count against a type the server has (type-coverage.ts): the test does not apply to this server,
+   * the run deadline stopped it, or an earlier failure in the run already fails it. ABSENT on a skip means the test did
+   * not pass, so a skip reason added later counts against the server until someone marks it excused on purpose (Josh,
+   * 2026-11-12: "if they have that type in at least one field, it's a fail if they don't pass on it").
+   */
+  readonly skipKind?: SkipKind;
   readonly assertions: ReadonlyArray<AssertionResult>;
   readonly duration: number;
   /** OData request latency in ms (excludes assertion/processing time). */
@@ -80,9 +88,9 @@ export interface TypeCoverage {
   readonly type: string;
   readonly field: string | undefined;
   readonly hasData: boolean;
-  /** The fields on this resource that PROVIDE the type (provided-types.ts): declared with it and holding enough
-   *  sampled data to meet it. Empty when the resource does not provide the type. */
-  readonly providedBy?: ReadonlyArray<string>;
+  /** The fields on this resource whose metadata DECLARES the type (declared-types.ts), most populated first. A type
+   *  declared on a resource tested is required. Empty when the resource does not declare the type. */
+  readonly declaredBy?: ReadonlyArray<DeclaringField>;
 }
 
 /** Result of running all scenarios for one resource. */
@@ -174,24 +182,24 @@ export const isInOperatorSkippedForVersion = (scenario: CoreScenario, detectedOD
  *  it, the scenario is certified on an alternate instead, and the field actually queried is the one named in that
  *  scenario's `requestUrl`. The enum slots have always behaved this way; since #315 the scalar slots do too. */
 export const buildCoverage = (params: TestParams): ReadonlyArray<TypeCoverage> => {
-  const providedBy = (type: string): ReadonlyArray<string> => params.providedTypes?.find(each => each.type === type)?.fields ?? [];
+  const declaredBy = (type: string): ReadonlyArray<DeclaringField> => params.declaredTypes?.find(each => each.type === type)?.fields ?? [];
   return [
-    { type: 'integer', field: params.integerField, hasData: params.integerValueLow != null, providedBy: providedBy('integer') },
-    { type: 'decimal', field: params.decimalField, hasData: params.decimalValueLow != null, providedBy: providedBy('decimal') },
-    { type: 'date', field: params.dateField, hasData: params.dateValue != null, providedBy: providedBy('date') },
-    { type: 'timestamp', field: params.timestampField, hasData: params.datetimeValue != null, providedBy: providedBy('timestamp') },
+    { type: 'integer', field: params.integerField, hasData: params.integerValueLow != null, declaredBy: declaredBy('integer') },
+    { type: 'decimal', field: params.decimalField, hasData: params.decimalValueLow != null, declaredBy: declaredBy('decimal') },
+    { type: 'date', field: params.dateField, hasData: params.dateValue != null, declaredBy: declaredBy('date') },
+    { type: 'timestamp', field: params.timestampField, hasData: params.datetimeValue != null, declaredBy: declaredBy('timestamp') },
     {
       type: 'singleLookup',
       field: params.singleLookupField,
       hasData: params.singleLookupValue != null,
-      providedBy: providedBy('singleLookup')
+      declaredBy: declaredBy('singleLookup')
     },
     // Two values, as the spec gives a multi-valued enumeration two (Core §3.3): has + and, any() and all() need both.
     {
       type: 'multiLookup',
       field: params.multiLookupField,
       hasData: params.multiLookupValue1 != null && params.multiLookupValue2 != null,
-      providedBy: providedBy('multiLookup')
+      declaredBy: declaredBy('multiLookup')
     }
   ];
 };
@@ -299,8 +307,11 @@ const paramsWithCandidate = (params: TestParams, slot: 'single' | 'multi', c: En
       };
 };
 
+/** The skips that do not count against a type the server has. See ScenarioResult.skipKind. */
+export type SkipKind = 'not-applicable' | 'deadline' | 'dependency';
+
 /** A skipped-scenario result with a diagnostic. A skip never counts toward pass/fail. */
-const skipResult = (scenario: CoreScenario, start: number, message: string): ScenarioResult => ({
+const skipResult = (scenario: CoreScenario, start: number, message: string, skipKind?: SkipKind): ScenarioResult => ({
   tag: scenario.tag,
   name: scenario.name,
   // A skip is neither a pass nor a failure. `passed: true` here read as a pass to anything looking
@@ -308,6 +319,7 @@ const skipResult = (scenario: CoreScenario, start: number, message: string): Sce
   passed: false,
   skipped: true,
   skipReason: message,
+  ...(skipKind ? { skipKind } : {}),
   assertions: [{ passed: true, message: `Skipped: ${message}` }],
   duration: Date.now() - start
 });
@@ -330,6 +342,7 @@ const deadlineSkipResult = (scenario: CoreScenario): ScenarioResult => ({
   passed: false,
   skipped: true,
   skipReason: DEADLINE_SKIP_REASON,
+  skipKind: 'deadline',
   assertions: [{ passed: true, message: DEADLINE_SKIP_REASON }],
   duration: 0,
   optional: scenario.optional
@@ -1219,7 +1232,8 @@ export const runEnumFamilyScenario = async (
     return skipResult(
       scenario,
       start,
-      `no ${slot}-valued enumeration field of this scenario's representation (category '${scenario.category}') supports "${op}" on this server`
+      `no ${slot}-valued enumeration field of this scenario's representation (category '${scenario.category}') supports "${op}" on this server`,
+      'not-applicable'
     );
   }
 
@@ -1505,7 +1519,12 @@ export const runLookupResourceScenario = async (
   const multi = (params.multiLookupCandidates ?? []).find(c => c.representation === 'COLLECTION_STRING');
   const targets = [single, multi].filter((c): c is EnumCandidate => c != null);
   if (targets.length === 0) {
-    return skipResult(scenario, start, 'no string (Lookup Resource) lookup field – enum-typed lookups have no Lookup Resource');
+    return skipResult(
+      scenario,
+      start,
+      'no string (Lookup Resource) lookup field – enum-typed lookups have no Lookup Resource',
+      'not-applicable'
+    );
   }
 
   // Validate each present string form against its own LookupName, sequentially so a LookupName shared across
@@ -2336,6 +2355,7 @@ export const runCoreResourceScenarios = async (
         passed: false,
         skipped: true,
         skipReason: 'lookup-resource-validation failed earlier in this run',
+        skipKind: 'dependency',
         assertions: [{ passed: false, message: 'Skipped: lookup-resource-validation failed earlier in this run' }],
         duration: 0,
         optional: scenario.optional
@@ -2354,6 +2374,7 @@ export const runCoreResourceScenarios = async (
         passed: false,
         skipped: true,
         skipReason: `'in' operator requires OData-Version 4.01 (server reports ${detectedODataVersion ?? 'no OData-Version'})`,
+        skipKind: 'not-applicable',
         assertions: [
           {
             passed: false,

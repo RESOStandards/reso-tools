@@ -12,6 +12,7 @@ import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import { type ODataRequester, buildResourceUrl, webRequester } from '../test-runner/index.js';
 import type { EntityType } from '../test-runner/types.js';
 import { extractNextLink } from './assertions.js';
+import { type DeclaredType, declaredTypesOf } from './declared-types.js';
 import type { NowFieldPastness } from './empty-verdict.js';
 import { type EnumCandidate, isMultiRep, isSingleRep, selectEnumCandidates } from './enum-selection.js';
 import {
@@ -22,7 +23,6 @@ import {
   matchedOverrides
 } from './field-override.js';
 import { rebaseNextLink } from './next-link.js';
-import { type ProvidedType, providedTypesOf } from './provided-types.js';
 import { ORIGINATING_SYSTEM_ID_FIELD, ORIGINATING_SYSTEM_NAME_FIELD, originatingSystemFilterClause } from './queries.js';
 import { type ScalarCandidate, collectFieldValues, selectScalarCandidates } from './scalar-selection.js';
 import type { StandardMap } from './standard-map.js';
@@ -162,8 +162,8 @@ export interface TestParams {
   readonly multiLookupDistinctCount?: number;
   readonly skippedTypes: ReadonlyArray<string>;
   /** The Core types this resource PROVIDES, read from its declared metadata types and its sampled data, independent of
-   *  field selection (see provided-types.ts). A type provided here and met nowhere fails full type coverage. */
-  readonly providedTypes?: ReadonlyArray<ProvidedType>;
+   *  field selection (see declared-types.ts). A type provided here and met nowhere fails full type coverage. */
+  readonly declaredTypes?: ReadonlyArray<DeclaredType>;
   /** Field overrides that actually pinned a candidate on this resource, exactly as the operator wrote them.
    *  An override replaces selection for its slot, so it changes WHAT WAS TESTED — the report has to say so, or
    *  an overridden run is indistinguishable from an automatic one and a provider could influence their own
@@ -703,7 +703,7 @@ export const resolveTestParams = async (
   }
 
   const keyValue = String(records[0][keyField] ?? '');
-  const providedTypes = providedTypesOf(entityType.properties, records, enumTypes);
+  const declaredTypes = declaredTypesOf(entityType.properties, records, enumTypes);
 
   // Categorize fields by type
   const integerFields = entityType.properties.filter(p => isIntegerType(p.type)).map(p => p.name);
@@ -906,7 +906,7 @@ export const resolveTestParams = async (
     expandNavs,
     lookupNameByField: Object.keys(lookupNameByField).length ? lookupNameByField : undefined,
     skippedTypes,
-    providedTypes,
+    declaredTypes,
     appliedFieldOverrides: appliedOverrides.length > 0 ? appliedOverrides : undefined
   };
 };

@@ -2,11 +2,12 @@ import type { CsdlEnumType } from '@reso-standards/reso-metadata-utils';
 import { describe, expect, it } from 'vitest';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import type { EntityProperty } from '../../src/test-runner/types.js';
+import { declaredCoreType, declaredTypesOf } from '../../src/web-api-core/declared-types.js';
 import { isMultiRep, isSingleRep, selectEnumCandidates } from '../../src/web-api-core/enum-selection.js';
-import { declaredCoreType, providedTypesOf } from '../../src/web-api-core/provided-types.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
+import { scenariosForVersion } from '../../src/web-api-core/scenarios.js';
 import { buildStandardMapFrom } from '../../src/web-api-core/standard-map.js';
-import { type TypeCoverage, buildCoverage } from '../../src/web-api-core/test-runner.js';
+import { type ScenarioResult, type SkipKind, type TypeCoverage, buildCoverage } from '../../src/web-api-core/test-runner.js';
 import { coverageFails, coverageFailureReasons, typeCoverageOf } from '../../src/web-api-core/type-coverage.js';
 
 /**
@@ -48,7 +49,8 @@ describe('whether a run met every type', () => {
       coveredTypes: ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'],
       missingTypes: [],
       fullCoverage: true,
-      providedNotMet: []
+      declaredNotMet: [],
+      testsNotPassed: []
     });
   });
 
@@ -104,12 +106,13 @@ describe('the multi-valued lookup a run tests', () => {
 });
 
 /**
- * Full type coverage is required (Josh, 2026-11-03: "For Cert, full coverage needs to be achieved across all types for a
- * Core server to be considered compliant"; 2026-11-12: "that's a must"), except for a type the server cannot fulfill:
- * "a server who can't fulfill all types in their standard or local fields is just recorded as not having achieved full
- * type coverage, but can still be certified". A certified run once met no single lookup on a resource carrying lookups.
+ * All data types are required for Web API Core when the server has them, whether in standard or local fields (Josh,
+ * 2026-11-12). "Has" is what the metadata declares, across every element: "if they have the types they have to fail if
+ * they don't provide some field that can be sampled with that type"; "if they don't have the type at all it can be
+ * skipped", "but we must never have seen them". When scanning cannot meet a declared type, the server names the field,
+ * and the reason suggests the most populated ones.
  */
-describe('a type the server provides must be met', () => {
+describe('a type the server declares must be met and must pass', () => {
   const prop = (name: string, type: string, lookupName?: string): EntityProperty => ({
     name,
     type,
@@ -141,47 +144,115 @@ describe('a type the server provides must be met', () => {
     expect(declaredCoreType(prop('Tags', 'Collection(Edm.String)'), enums)).toBeUndefined();
   });
 
-  it('counts a type as provided only when sampled data can meet it: a multi-valued lookup needs two values', () => {
+  it('counts a declared field whatever its data, empty included, and ranks the fields by population', () => {
     const properties = [
-      prop('StandardStatus', 'Edm.String', 'StandardStatus'),
-      prop('RentIncludes', 'Collection(Edm.String)', 'RentIncludes'),
-      prop('Appliances', 'org.reso.metadata.enums.Appliances'),
-      prop('CloseDate', 'Edm.Date')
+      prop('CloseDate', 'Edm.Date'),
+      prop('ListingContractDate', 'Edm.Date'),
+      prop('RentIncludes', 'Collection(Edm.String)', 'RentIncludes')
     ];
     const records = [
-      { StandardStatus: 'Active', RentIncludes: ['None'], Appliances: 3, CloseDate: null },
-      { StandardStatus: null, RentIncludes: ['None'], Appliances: null, CloseDate: null }
+      { CloseDate: null, ListingContractDate: '2026-10-01', RentIncludes: ['None'] },
+      { CloseDate: null, ListingContractDate: '2026-10-02', RentIncludes: ['None'] }
     ];
-    // RentIncludes holds one value, so it cannot fulfill a multi-valued lookup; Appliances 3 is two flags. CloseDate is
-    // declared and empty: the server cannot fulfill a date, so it is not provided.
-    expect(providedTypesOf(properties, records, enums)).toEqual([
-      { type: 'singleLookup', fields: ['StandardStatus'] },
-      { type: 'multiLookup', fields: ['Appliances'] }
+    expect(declaredTypesOf(properties, records, enums)).toEqual([
+      {
+        type: 'date',
+        fields: [
+          { field: 'ListingContractDate', populated: 2 },
+          { field: 'CloseDate', populated: 0 }
+        ]
+      },
+      { type: 'multiLookup', fields: [{ field: 'RentIncludes', populated: 2 }] }
     ]);
   });
 
-  const report = (resource: string, coverage: ReadonlyArray<TypeCoverage>) => ({ resource, coverage });
-  const metExcept = (missing: string, providedBy: ReadonlyArray<string>) =>
+  const report = (resource: string, coverage: ReadonlyArray<TypeCoverage>, scenarios: ReadonlyArray<ScenarioResult> = []) => ({
+    resource,
+    coverage,
+    scenarios,
+    params: { sampleRecordCount: 1000 }
+  });
+  const metExcept = (missing: string, declaredBy: ReadonlyArray<{ field: string; populated: number }>) =>
     ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'].map(type =>
-      type === missing ? { type, field: undefined, hasData: false, providedBy } : { type, field: 'F', hasData: true, providedBy: ['F'] }
+      type === missing
+        ? { type, field: undefined, hasData: false, declaredBy }
+        : { type, field: 'F', hasData: true, declaredBy: [{ field: 'F', populated: 1000 }] }
     );
 
-  it('fails a run that met no single lookup though the server provides one, naming the field', () => {
-    const verdict = typeCoverageOf([report('Property', metExcept('singleLookup', ['StandardStatus']))]);
-    expect(verdict.providedNotMet).toEqual([{ type: 'singleLookup', fields: ['Property.StandardStatus'] }]);
+  it('fails a run that could not sample a declared type, and suggests the most populated fields to name', () => {
+    const verdict = typeCoverageOf([
+      report('Property', metExcept('date', [{ field: 'CloseDate', populated: 0 }])),
+      report('Member', metExcept('date', [{ field: 'MemberJoinDate', populated: 640 }]))
+    ]);
+    expect(verdict.declaredNotMet).toEqual([
+      {
+        type: 'date',
+        fields: [
+          { field: 'Member.MemberJoinDate', populated: 640, sampled: 1000 },
+          { field: 'Property.CloseDate', populated: 0, sampled: 1000 }
+        ]
+      }
+    ]);
     expect(coverageFails(verdict, false, true)).toBe(true);
     expect(coverageFailureReasons(verdict, false)).toEqual([
-      'Full type coverage not achieved: the server provides singleLookup in Property.StandardStatus, and the run met no singleLookup'
+      'All data types are required for Web API Core when the server has them, whether in standard or local fields. The server declares date, and the run could not sample a field of it. Name the field to test with --field-overrides (coreOptions.fieldOverrides in a configuration file). Most populated: Member.MemberJoinDate (640 of 1,000 sampled records), Property.CloseDate (0 of 1,000 sampled records)'
     ]);
   });
 
-  it('records a type the server does not provide, and lets the run certify', () => {
+  it('counts a type seen only on a resource the run did not test, and says to name that resource', () => {
+    const verdict = typeCoverageOf(
+      [report('Property', metExcept('date', []))],
+      [],
+      [{ resource: 'Widget', declared: [{ type: 'date', fields: [{ field: 'WidgetDate' }] }] }]
+    );
+    expect(verdict.declaredNotMet).toEqual([{ type: 'date', fields: [{ field: 'Widget.WidgetDate' }] }]);
+    expect(coverageFailureReasons(verdict, false)[0]).toContain(
+      'Widget.WidgetDate (its resource was not tested: name it with --resources)'
+    );
+  });
+
+  it('skips a type the server never declares, and lets the run certify', () => {
     const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
-    expect(verdict).toMatchObject({ missingTypes: ['date'], fullCoverage: false, providedNotMet: [] });
+    expect(verdict).toMatchObject({ missingTypes: ['date'], fullCoverage: false, declaredNotMet: [] });
     expect(coverageFails(verdict, false, true)).toBe(false);
   });
 
-  it('fails any missing type in strict mode, the Core 2.0.0 parity mode, provided or not', () => {
+  const scenario = scenariosForVersion('2.1.0').find(each => each.tag === 'filter-date-ne');
+  const skipped = (skipKind?: SkipKind): ScenarioResult => ({
+    tag: 'filter-date-ne',
+    name: 'Date: ne',
+    passed: false,
+    skipped: true,
+    skipReason: 'not conclusively testable',
+    ...(skipKind ? { skipKind } : {}),
+    assertions: [],
+    duration: 0
+  });
+
+  it('fails a met type whose required test passed nowhere, naming the test and why', () => {
+    expect(scenario).toBeDefined();
+    const verdict = typeCoverageOf([report('Property', metExcept('none', []), [skipped()])], scenario ? [scenario] : []);
+    expect(verdict.testsNotPassed).toEqual([
+      { type: 'date', tag: 'filter-date-ne', name: 'Date: ne', reason: 'not conclusively testable' }
+    ]);
+    expect(coverageFails(verdict, false, true)).toBe(true);
+  });
+
+  it('excuses a test that does not apply to the server, one no resource ran, and one that passed on another resource', () => {
+    const scenarios = scenario ? [scenario] : [];
+    // Not run at all: a test of a representation the server does not use is never selected for it.
+    expect(typeCoverageOf([report('Property', metExcept('none', []))], scenarios).testsNotPassed).toEqual([]);
+    expect(typeCoverageOf([report('Property', metExcept('none', []), [skipped('not-applicable')])], scenarios).testsNotPassed).toEqual([]);
+    const passedElsewhere = { ...skipped(), skipped: false, passed: true };
+    expect(
+      typeCoverageOf(
+        [report('Property', metExcept('none', []), [skipped()]), report('Member', metExcept('none', []), [passedElsewhere])],
+        scenarios
+      ).testsNotPassed
+    ).toEqual([]);
+  });
+
+  it('fails any missing type in strict mode, the Core 2.0.0 parity mode, declared or not', () => {
     const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
     expect(coverageFails(verdict, true, true)).toBe(true);
     expect(coverageFailureReasons(verdict, true)).toEqual(['Full coverage required but missing types: date']);
@@ -195,9 +266,9 @@ describe('a type the server provides must be met', () => {
 
   /**
    * What must not be lost for an MLS (Josh, 2026-11-12): its Property resource carries all six types, so all six are
-   * provided and all six must be met. "The rule for MLSs is still full coverage, if possible, on Core."
+   * declared and all six must be met. "We need to see each type exercised."
    */
-  it('requires all six types of an MLS whose Property resource carries them, and fails a run that misses one', () => {
+  it('requires all six types of an MLS whose Property resource carries them, and fails a run that misses any one', () => {
     const properties = [
       prop('ListingKey', 'Edm.String'),
       prop('BedroomsTotal', 'Edm.Int32'),
@@ -207,31 +278,20 @@ describe('a type the server provides must be met', () => {
       prop('StandardStatus', 'Edm.String', 'StandardStatus'),
       prop('InteriorFeatures', 'Collection(Edm.String)', 'InteriorFeatures')
     ];
-    const records = [
-      {
-        ListingKey: '1',
-        BedroomsTotal: 3,
-        ListPrice: 350000,
-        ListingContractDate: '2026-10-01',
-        ModificationTimestamp: '2026-10-02T00:00:00Z',
-        StandardStatus: 'Active',
-        InteriorFeatures: ['Pantry', 'Elevator']
-      }
-    ];
-    const provided = providedTypesOf(properties, records, enums);
-    expect(provided.map(each => each.type)).toEqual(['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']);
+    const declared = declaredTypesOf(properties, [], enums);
+    expect(declared.map(each => each.type)).toEqual(['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']);
 
     const coverage = (missing: string): ReadonlyArray<TypeCoverage> =>
-      provided.map(({ type, fields }) => ({ type, field: fields[0], hasData: type !== missing, providedBy: fields }));
+      declared.map(({ type, fields }) => ({ type, field: fields[0].field, hasData: type !== missing, declaredBy: fields }));
     for (const missing of ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']) {
-      const verdict = typeCoverageOf([report('Property', coverage(missing))]);
-      expect(coverageFails(verdict, false, true), missing).toBe(true);
+      expect(coverageFails(typeCoverageOf([report('Property', coverage(missing))]), false, true), missing).toBe(true);
     }
     expect(coverageFails(typeCoverageOf([report('Property', coverage('none'))]), false, true)).toBe(false);
   });
 
-  it('names at most three providing fields in the reason, and counts the rest', () => {
-    const verdict = typeCoverageOf([report('Property', metExcept('integer', ['A', 'B', 'C', 'D', 'E']))]);
-    expect(coverageFailureReasons(verdict, false)[0]).toContain('Property.A, Property.B, Property.C and 2 more');
+  it('suggests at most five fields in the reason, and points to the report for the rest', () => {
+    const many = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((field, index) => ({ field, populated: 100 - index }));
+    const reason = coverageFailureReasons(typeCoverageOf([report('Property', metExcept('integer', many))]), false)[0];
+    expect(reason).toContain('Property.E (96 of 1,000 sampled records), and 2 more in the report');
   });
 });

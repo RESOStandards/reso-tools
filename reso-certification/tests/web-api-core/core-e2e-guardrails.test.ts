@@ -71,14 +71,16 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
       coveredTypes: string[];
       missingTypes: string[];
       fullCoverage: boolean;
-      providedNotMet: ReadonlyArray<{ type: string; fields: ReadonlyArray<string> }>;
+      declaredNotMet: ReadonlyArray<unknown>;
+      testsNotPassed: ReadonlyArray<unknown>;
     };
 
     expect(detailed.typeCoverage).toEqual({
       achieved: matrix.fullCoverage,
       coveredTypes: matrix.coveredTypes,
       missingTypes: matrix.missingTypes,
-      providedNotMet: matrix.providedNotMet
+      declaredNotMet: matrix.declaredNotMet,
+      testsNotPassed: matrix.testsNotPassed
     });
     expect([...detailed.typeCoverage.coveredTypes, ...detailed.typeCoverage.missingTypes].sort()).toEqual([
       'date',

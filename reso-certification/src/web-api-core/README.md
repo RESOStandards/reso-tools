@@ -164,21 +164,23 @@ all six. A single-valued lookup is met with one sampled value and a multi-valued
 gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
 goes to the next field, and with none left the type is not met.
 
-Full type coverage is required for certification. A type the server provides must be met: one it declares on a
-resource tested, in a standard or local field holding enough sampled data to meet it. A type the server provides on no
-resource tested is recorded as not achieved, and the run can still be certified. Which types a resource provides is read
-from its declared metadata types and its sampled data, independent of field selection, so a type selection missed
-still fails the run.
+All data types are required for Web API Core when the server has them, whether in standard or local fields. A type the
+metadata declares, on any resource, must be met and its required tests must pass. When the run cannot sample a field for
+a declared type, it fails and lists the most populated fields of that type, so the provider can name one with
+`--field-overrides`; a field on a resource the run did not test is listed with a note to name the resource. A type the
+metadata never declares is not required. Which types the server declares is read from the metadata alone, independent
+of field selection, so a type selection missed still fails the run. A test that does not apply to the server (another
+lookup representation, `in` on OData 4.0) is not counted against it.
 
 Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
 name the fields from your 2.0.0 report with `--field-overrides`. The key field and the values tested stay the run's own
 (see the [User Guide](https://tools.reso.org/guides/reso-certification/#web-api-core-210)).
 
 - **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
-  (`achieved`, `coveredTypes`, `missingTypes`, and `providedNotMet` with the fields that provide each missing type the
-  server has), and in the run's summary.
-- **By default**, a missing type the server provides fails the run, and the reason names the fields that provide it.
-- **`--full-coverage`**: any missing type fails the run, provided or not.
+  (`achieved`, `coveredTypes`, `missingTypes`, `declaredNotMet` with the fields to name for each missing declared type,
+  and `testsNotPassed`), and in the run's summary.
+- **By default**, a missing declared type, or a required test of a met type that did not pass, fails the run.
+- **`--full-coverage`**: any missing type fails the run, declared or not.
 
 ## Report Format
 

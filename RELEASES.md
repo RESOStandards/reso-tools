@@ -40,10 +40,11 @@
   Data Dictionary defines. Before, it tested six listing resources (Property, Member, Office, Media, OpenHouse, Showing),
   so resources such as PropertyRooms, Teams or Lookup went untested, and a server serving none of the six was asked for
   nothing. `--resources` still narrows the run, and a local resource is tested only when named.
-- **Full type coverage is required:** a data type the server provides on a resource tested must be met, or the run
-  fails and names the fields that provide it. A type the server provides nowhere is recorded, and the run can still be
-  certified. Before, a missing type failed the run only with `--full-coverage`. `report-detailed.json` lists the
-  missing types the server provides in `typeCoverage.providedNotMet`.
+- **All data types are required when the server has them, in standard or local fields:** a type the metadata declares
+  must be met and its required tests must pass. When the run cannot sample a field for a declared type, it fails and
+  lists the most populated fields of that type to name with `--field-overrides`. A type the metadata never declares is
+  not required. Before, a missing type failed the run only with `--full-coverage`. `report-detailed.json` lists them
+  in `typeCoverage.declaredNotMet` and `typeCoverage.testsNotPassed`.
 - **`--full-coverage` is the strict mode:** every type must be met, none excused. With one resource named, it tests as
   Core 2.0.0 did.
 - **Section 3.2 is checked:** a server must expose at least one Property, Member, Office, Media or InternetTracking

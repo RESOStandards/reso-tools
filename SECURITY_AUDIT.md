@@ -32,7 +32,7 @@ already open, its check of the review pool, Web API Core's choice of resources a
   goes into the URL as before. The run makes more requests to the provider's server than before, one sample per
   resource it tests, within the existing run deadline.
 - **Package contents:** `npm pack --dry-run` lists 570 files under the `files` allowlist, twelve more than 0.12.2 (the
-  compiled `apply` modules, and `web-api-core/provided-types`): no tests, fixtures, environment files or credentials.
+  compiled `apply` modules, and `web-api-core/declared-types`): no tests, fixtures, environment files or credentials.
 - **Supply chain:** `npm audit --omit=dev` across the repository still reports `zod`
   ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high) and `@hono/node-server`
   ([GHSA-qv5m-9pm6-hqp3](https://github.com/advisories/GHSA-qv5m-9pm6-hqp3),
@@ -43,7 +43,7 @@ already open, its check of the review pool, Web API Core's choice of resources a
 ### Method
 
 Review of every change since 0.12.2 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the
-listed files, the full test suite (3,511 tests across 8 packages, 2,378 in this package), and the command run end to
+listed files, the full test suite (3,515 tests across 8 packages, 2,382 in this package), and the command run end to
 end against a local instance of the certification services: a dry run, a save, a re-run that changed nothing, and a
 review-pool row put right after a comment-only save had cleared it.
 

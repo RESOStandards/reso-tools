@@ -361,7 +361,16 @@ export const createDetailedReportGenerator = (
           readonly coveredTypes: ReadonlyArray<string>;
           readonly missingTypes: ReadonlyArray<string>;
           readonly fullCoverage: boolean;
-          readonly providedNotMet?: ReadonlyArray<{ readonly type: string; readonly fields: ReadonlyArray<string> }>;
+          readonly declaredNotMet?: ReadonlyArray<{
+            readonly type: string;
+            readonly fields: ReadonlyArray<{ readonly field: string; readonly populated?: number; readonly sampled?: number }>;
+          }>;
+          readonly testsNotPassed?: ReadonlyArray<{
+            readonly type: string;
+            readonly tag: string;
+            readonly name: string;
+            readonly reason: string;
+          }>;
         }
       | undefined;
 
@@ -377,9 +386,11 @@ export const createDetailedReportGenerator = (
               achieved: coverageMatrix.fullCoverage,
               coveredTypes: coverageMatrix.coveredTypes,
               missingTypes: coverageMatrix.missingTypes,
-              // Missing types the server provides, with the fields that provide them: each one fails the run (a type
-              // the server cannot fulfill is the only one excused). See web-api-core/type-coverage.ts.
-              providedNotMet: coverageMatrix.providedNotMet ?? []
+              // Missing types the server declares, with the fields to name for them, most populated first: each one
+              // fails the run until the server names a field. A type it never declares is not required.
+              declaredNotMet: coverageMatrix.declaredNotMet ?? [],
+              // Required tests of a type the server has that passed on no resource tested: each fails the run.
+              testsNotPassed: coverageMatrix.testsNotPassed ?? []
             }
           }
         : {}),

@@ -656,7 +656,7 @@ const coreCmd = program
   )
   .option(
     '--full-coverage',
-    'Fail if any data type is met on no resource tested, the strict mode for Core 2.0.0 parity. Without it, a type the server provides must still be met, and one it provides on no resource tested is recorded'
+    'Fail if any data type is met on no resource tested, the strict mode for Core 2.0.0 parity. Without it, every type the server declares must still be met and pass, and a type it never declares is not required'
   )
   .option(
     '--save-payloads <dir>',

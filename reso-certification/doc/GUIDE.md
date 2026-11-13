@@ -135,10 +135,11 @@ on some field of some resource it tested. A single-valued lookup is met with one
 multi-valued lookup with two, as the specification gives them. Every run records whether it achieved
 full type coverage, in `report-detailed.json` as `typeCoverage`.
 
-Full type coverage is required for certification. A type your server provides must be met: one it
-declares on a resource tested, in a standard or local field with enough data in the sample to meet it.
-A type your server provides on no resource tested is recorded as not achieved, and the run can still be
-certified. When a type you provide is not met, the run fails and names the fields that provide it.
+All data types are required for Web API Core when your server has them, whether in standard or local
+fields. A type your metadata declares must be met and its tests must pass. The run looks for a field it
+can sample for each type; when it cannot find one for a type you declare, the run fails, and the reason
+lists your most populated fields of that type so you can name one with `--field-overrides`. A type your
+metadata never declares is not required.
 
 The run tests every Data Dictionary resource your metadata declares. To test fewer, name them with
 `--resources`; to test a local resource, name it too. To be certified, your server must expose at least one
