@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { DdReference } from '../../src/metadata/dd-metadata-checks.js';
 import type { EntityProperty } from '../../src/test-runner/types.js';
 import { isMultiRep, isSingleRep, selectEnumCandidates } from '../../src/web-api-core/enum-selection.js';
+import { declaredCoreType, providedTypesOf } from '../../src/web-api-core/provided-types.js';
 import type { TestParams } from '../../src/web-api-core/sampling.js';
 import { buildStandardMapFrom } from '../../src/web-api-core/standard-map.js';
 import { type TypeCoverage, buildCoverage } from '../../src/web-api-core/test-runner.js';
-import { typeCoverageOf } from '../../src/web-api-core/type-coverage.js';
+import { coverageFails, coverageFailureReasons, typeCoverageOf } from '../../src/web-api-core/type-coverage.js';
 
 /**
  * Full type coverage (Josh, 2026-11-03): every data type the Core tests exercise, met on some field of some resource
@@ -46,7 +47,8 @@ describe('whether a run met every type', () => {
     expect(verdict).toEqual({
       coveredTypes: ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'],
       missingTypes: [],
-      fullCoverage: true
+      fullCoverage: true,
+      providedNotMet: []
     });
   });
 
@@ -98,5 +100,101 @@ describe('the multi-valued lookup a run tests', () => {
 
   it('leaves the single-valued ranking as it was: one value is all a single-valued lookup needs', () => {
     expect(select([lookup('PropertyType', false), lookup('LocalType', false)], isSingleRep)).toEqual(['PropertyType', 'LocalType']);
+  });
+});
+
+/**
+ * Full type coverage is required (Josh, 2026-11-03: "For Cert, full coverage needs to be achieved across all types for a
+ * Core server to be considered compliant"; 2026-11-12: "that's a must"), except for a type the server cannot fulfill:
+ * "a server who can't fulfill all types in their standard or local fields is just recorded as not having achieved full
+ * type coverage, but can still be certified". A certified run once met no single lookup on a resource carrying lookups.
+ */
+describe('a type the server provides must be met', () => {
+  const prop = (name: string, type: string, lookupName?: string): EntityProperty => ({
+    name,
+    type,
+    ...(lookupName ? { annotations: { 'RESO.OData.Metadata.LookupName': lookupName } } : {})
+  });
+  const enums: ReadonlyArray<CsdlEnumType> = [
+    { name: 'StandardStatus', members: [{ name: 'Active' }, { name: 'Closed' }] },
+    {
+      name: 'Appliances',
+      members: [
+        { name: 'Dishwasher', value: '1' },
+        { name: 'Dryer', value: '2' }
+      ],
+      isFlags: true
+    }
+  ];
+
+  it('reads the type from the declared metadata, every lookup form the spec allows included', () => {
+    expect(declaredCoreType(prop('BedroomsTotal', 'Edm.Int32'), enums)).toBe('integer');
+    expect(declaredCoreType(prop('ListPrice', 'Edm.Double'), enums)).toBe('decimal');
+    expect(declaredCoreType(prop('ListingContractDate', 'Edm.Date'), enums)).toBe('date');
+    expect(declaredCoreType(prop('ModificationTimestamp', 'Edm.DateTimeOffset'), enums)).toBe('timestamp');
+    expect(declaredCoreType(prop('StandardStatus', 'org.reso.metadata.enums.StandardStatus'), enums)).toBe('singleLookup');
+    expect(declaredCoreType(prop('StandardStatus', 'Edm.String', 'StandardStatus'), enums)).toBe('singleLookup');
+    expect(declaredCoreType(prop('Appliances', 'org.reso.metadata.enums.Appliances'), enums)).toBe('multiLookup');
+    expect(declaredCoreType(prop('Appliances', 'Collection(org.reso.metadata.enums.Appliances)'), enums)).toBe('multiLookup');
+    expect(declaredCoreType(prop('Appliances', 'Collection(Edm.String)', 'Appliances'), enums)).toBe('multiLookup');
+    expect(declaredCoreType(prop('City', 'Edm.String'), enums)).toBeUndefined();
+    expect(declaredCoreType(prop('Tags', 'Collection(Edm.String)'), enums)).toBeUndefined();
+  });
+
+  it('counts a type as provided only when sampled data can meet it: a multi-valued lookup needs two values', () => {
+    const properties = [
+      prop('StandardStatus', 'Edm.String', 'StandardStatus'),
+      prop('RentIncludes', 'Collection(Edm.String)', 'RentIncludes'),
+      prop('Appliances', 'org.reso.metadata.enums.Appliances'),
+      prop('CloseDate', 'Edm.Date')
+    ];
+    const records = [
+      { StandardStatus: 'Active', RentIncludes: ['None'], Appliances: 3, CloseDate: null },
+      { StandardStatus: null, RentIncludes: ['None'], Appliances: null, CloseDate: null }
+    ];
+    // RentIncludes holds one value, so it cannot fulfill a multi-valued lookup; Appliances 3 is two flags. CloseDate is
+    // declared and empty: the server cannot fulfill a date, so it is not provided.
+    expect(providedTypesOf(properties, records, enums)).toEqual([
+      { type: 'singleLookup', fields: ['StandardStatus'] },
+      { type: 'multiLookup', fields: ['Appliances'] }
+    ]);
+  });
+
+  const report = (resource: string, coverage: ReadonlyArray<TypeCoverage>) => ({ resource, coverage });
+  const metExcept = (missing: string, providedBy: ReadonlyArray<string>) =>
+    ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'].map(type =>
+      type === missing ? { type, field: undefined, hasData: false, providedBy } : { type, field: 'F', hasData: true, providedBy: ['F'] }
+    );
+
+  it('fails a run that met no single lookup though the server provides one, naming the field', () => {
+    const verdict = typeCoverageOf([report('Property', metExcept('singleLookup', ['StandardStatus']))]);
+    expect(verdict.providedNotMet).toEqual([{ type: 'singleLookup', fields: ['Property.StandardStatus'] }]);
+    expect(coverageFails(verdict, false, true)).toBe(true);
+    expect(coverageFailureReasons(verdict, false)).toEqual([
+      'Full type coverage not achieved: the server provides singleLookup in Property.StandardStatus, and the run met no singleLookup'
+    ]);
+  });
+
+  it('records a type the server does not provide, and lets the run certify', () => {
+    const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
+    expect(verdict).toMatchObject({ missingTypes: ['date'], fullCoverage: false, providedNotMet: [] });
+    expect(coverageFails(verdict, false, true)).toBe(false);
+  });
+
+  it('fails any missing type in strict mode, the Core 2.0.0 parity mode, provided or not', () => {
+    const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
+    expect(coverageFails(verdict, true, true)).toBe(true);
+    expect(coverageFailureReasons(verdict, true)).toEqual(['Full coverage required but missing types: date']);
+  });
+
+  it('is never a coverage failure when no record was tested: nothing was measured, and the run fails for that', () => {
+    const verdict = typeCoverageOf([]);
+    expect(coverageFails(verdict, true, false)).toBe(false);
+    expect(coverageFails(verdict, false, false)).toBe(false);
+  });
+
+  it('names at most three providing fields in the reason, and counts the rest', () => {
+    const verdict = typeCoverageOf([report('Property', metExcept('integer', ['A', 'B', 'C', 'D', 'E']))]);
+    expect(coverageFailureReasons(verdict, false)[0]).toContain('Property.A, Property.B, Property.C and 2 more');
   });
 });

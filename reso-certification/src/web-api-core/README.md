@@ -5,16 +5,16 @@ Validates OData query capabilities against the [RESO Web API Core specification]
 ## Usage
 
 ```bash
-# Test all well-known resources
+# Test every Data Dictionary resource the server declares
 reso-cert core --url https://api.example.com --auth-token TOKEN
 
-# Specific resources
+# Specific resources, local ones included
 reso-cert core --url https://api.example.com --auth-token TOKEN --resources Property,Member
 
 # Version 2.1.0
 reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 
-# Require full data type coverage
+# Require every data type, with none excused (Core 2.0.0 parity, with one resource named)
 reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage
 ```
 
@@ -162,16 +162,23 @@ Office:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  mul
 Full type coverage means each of the six types is met on some field of some resource tested. No resource has to carry
 all six. A single-valued lookup is met with one sampled value and a multi-valued lookup with two, as the specification
 gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
-goes to the next field, and with none left the type is not met. A server that cannot meet every type in its standard or local fields is recorded as not having achieved full
-type coverage, and can still be certified.
+goes to the next field, and with none left the type is not met.
+
+Full type coverage is required for certification. A type the server provides must be met: one it declares on a
+resource tested, in a standard or local field holding enough sampled data to meet it. A type the server provides on no
+resource tested is recorded as not achieved, and the run can still be certified. Which types a resource provides is read
+from its declared metadata types and its sampled data, independent of field selection, so a type selection missed
+still fails the run.
 
 Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
 name the fields from your 2.0.0 report with `--field-overrides`. The key field and the values tested stay the run's own
 (see the [User Guide](https://tools.reso.org/guides/reso-certification/#web-api-core-210)).
 
 - **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
-  (`achieved`, `coveredTypes`, `missingTypes`), and in the run's summary. A run passes as long as no scenario fails.
-- **`--full-coverage`**: a missing type fails the run too.
+  (`achieved`, `coveredTypes`, `missingTypes`, and `providedNotMet` with the fields that provide each missing type the
+  server has), and in the run's summary.
+- **By default**, a missing type the server provides fails the run, and the reason names the fields that provide it.
+- **`--full-coverage`**: any missing type fails the run, provided or not.
 
 ## Report Format
 

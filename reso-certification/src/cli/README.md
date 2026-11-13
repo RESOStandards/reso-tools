@@ -176,12 +176,12 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2
 |---|---|---|
 | `--url <url>` | – | Server base URL (mutually exclusive with `--config`) |
 | `--config <path>` | – | Config file with one or more provider entries |
-| `--resources <list>` | well-known list | Comma-separated resource names |
+| `--resources <list>` | every Data Dictionary resource the server declares | Comma-separated resource names; local resources are tested only when named |
 | `--spec-version <2.0.0\|2.1.0>` | `2.1.0` | Spec version. Only 2.1.0, the latest minor, certifies, so a 2.0.0 run is a retest. Config-file mode takes the version from the config entry and ignores this flag. |
 | `--enum-mode <auto\|string\|collections\|isflags>` | `auto` | How enumerations are represented (auto-detected by default) |
 | `--field-overrides <list>` | _(auto)_ | Comma-separated `Resource.Field` (a bare `Field` is not accepted). The named field **replaces** automatic selection for its data type on that resource, and for an enumeration for its own representation: it is the field tested, nothing automatic sits behind it, and a field the service will not filter on fails its test. Name two fields of the same type and both are tried, in the order written. A **sparse** override: every slot not named here is still auto-selected. An entry that resolves to nothing leaves its slot automatic and is reported as unmatched. Replaces `coreOptions.fieldOverrides` from a config rather than merging with it. |
 | `--prefer-fields <list>` | – | **Removed in 0.11.1.** Prints an explanation and is ignored. Use `--field-overrides`; note that the behavior changed from re-ordering candidates to replacing them, so a named field now owns its outcome. |
-| `--full-coverage` | – | Fail the run if any data type is not met on some resource tested (every run records whether it was) |
+| `--full-coverage` | – | Fail the run if any data type is not met on some resource tested. Without it, a type the server provides must still be met, and one it provides nowhere is recorded |
 | `--originating-system-name <v>` | – | Scope resource queries to `OriginatingSystemName eq <v>` (multi-tenant providers) |
 | `--originating-system-id <v>` | – | Scope by `OriginatingSystemID` instead. Used only when no name is given |
 | `--save-payloads <dir>` | *(off)* | Write every request and response to `<dir>`. See below. |

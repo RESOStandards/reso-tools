@@ -118,9 +118,26 @@ const isValidRef = (ref: DdReference | null): ref is DdReference => !!ref && Arr
  * is "latest major.minor" (during a major-version adoption year two versions coexist; prefer the latest).
  * Only if no reference loads at all does the map degrade to {@link EMPTY_STANDARD_MAP} — never a crash.
  */
-export const buildStandardMap = (version: string): StandardMap => {
+/** The DD reference for a Core version (`2.1.0` → `dd-2.1.json`), else the latest published DD, else undefined. */
+const referenceFor = (version: string): DdReference | undefined => {
   const ddVersion = version.split('.').slice(0, 2).join('.');
   const requested = getReferenceMetadata(ddVersion);
   const ref = isValidRef(requested) ? requested : getReferenceMetadata(); // fall back to the latest published DD
-  return isValidRef(ref) ? buildStandardMapFrom(ref) : EMPTY_STANDARD_MAP;
+  return isValidRef(ref) ? ref : undefined;
+};
+
+export const buildStandardMap = (version: string): StandardMap => {
+  const ref = referenceFor(version);
+  return ref ? buildStandardMapFrom(ref) : EMPTY_STANDARD_MAP;
+};
+
+/**
+ * The resources the Data Dictionary defines, for a Core version: every resource a DD field belongs to, read from the
+ * same reference as {@link buildStandardMap}. A Core run with no resources named tests every one of these the server
+ * declares (Josh, 2026-11-12: "It should be every RESO resource, we can't expect their local ones to be compliant").
+ * Undefined when no reference loads, so the caller can refuse rather than test a guessed list.
+ */
+export const ddResourcesFor = (version: string): ReadonlySet<string> | undefined => {
+  const ref = referenceFor(version);
+  return ref ? new Set(ref.fields.map(field => field.resourceName)) : undefined;
 };

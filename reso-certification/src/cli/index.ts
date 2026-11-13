@@ -642,7 +642,7 @@ const coreCmd = program
   .description('Web API Core 2.0.0/2.1.0 compliance testing')
   .option('--url <url>', 'Server base URL (mutually exclusive with --config)')
   .option('--config <path>', 'Path to a config file – runs every entry (mutually exclusive with --url)')
-  .option('--resources <list>', 'Comma-separated resource names (default: well-known list)')
+  .option('--resources <list>', 'Comma-separated resource names (default: every Data Dictionary resource the server declares)')
   // `--spec-version` (not `--version`, which is reserved for the program's own `-V`). Defaults to the current
   // minor, so a plain `reso-cert core --url …` certifies the latest Core without the caller passing a version.
   .option(
@@ -656,7 +656,7 @@ const coreCmd = program
   )
   .option(
     '--full-coverage',
-    'Fail if any data type is met on no resource tested. Without it, the detailed report still records whether full type coverage was achieved'
+    'Fail if any data type is met on no resource tested, the strict mode for Core 2.0.0 parity. Without it, a type the server provides must still be met, and one it provides on no resource tested is recorded'
   )
   .option(
     '--save-payloads <dir>',

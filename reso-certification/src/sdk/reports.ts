@@ -357,7 +357,12 @@ export const createDetailedReportGenerator = (
     // Web API Core: whether every data type was met, so a certification can say "Full Type Coverage Achieved" or "Could
     // Not Be Achieved" (Josh, 2026-11-03). Here and not in `report.json`, whose key set the Cert API pins.
     const coverageMatrix = ctx.coverageMatrix as
-      | { readonly coveredTypes: ReadonlyArray<string>; readonly missingTypes: ReadonlyArray<string>; readonly fullCoverage: boolean }
+      | {
+          readonly coveredTypes: ReadonlyArray<string>;
+          readonly missingTypes: ReadonlyArray<string>;
+          readonly fullCoverage: boolean;
+          readonly providedNotMet?: ReadonlyArray<{ readonly type: string; readonly fields: ReadonlyArray<string> }>;
+        }
       | undefined;
 
     return {
@@ -371,7 +376,10 @@ export const createDetailedReportGenerator = (
             typeCoverage: {
               achieved: coverageMatrix.fullCoverage,
               coveredTypes: coverageMatrix.coveredTypes,
-              missingTypes: coverageMatrix.missingTypes
+              missingTypes: coverageMatrix.missingTypes,
+              // Missing types the server provides, with the fields that provide them: each one fails the run (a type
+              // the server cannot fulfill is the only one excused). See web-api-core/type-coverage.ts.
+              providedNotMet: coverageMatrix.providedNotMet ?? []
             }
           }
         : {}),

@@ -8,7 +8,8 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.3, covering every change since 0.12.2: the
 `apply-variation-decisions` command, which applies a sheet of RESO's actions and comments to a variations review
-already open, its check of the review pool, and `fast-xml-parser` 5.12.0.
+already open, its check of the review pool, Web API Core's choice of resources and its type coverage rule, and
+`fast-xml-parser` 5.12.0.
 
 ### Findings Addressed
 
@@ -26,8 +27,12 @@ already open, its check of the review pool, and `fast-xml-parser` 5.12.0.
 - **A locked review is left alone:** when someone holds the review, the command says who and stops. Nothing is
   retried.
 - **Output:** the command prints the names of the variables it read from `.env`, never their values.
-- **Package contents:** `npm pack --dry-run` lists 566 files under the `files` allowlist, eight more than 0.12.2 (the
-  compiled `apply` modules): no tests, fixtures, environment files or credentials.
+- **Which resources Core requests:** with none named, the names come from the server's own metadata and only those the
+  Data Dictionary defines are requested, so a name the server makes up never reaches a request URL. A named resource
+  goes into the URL as before. The run makes more requests to the provider's server than before, one sample per
+  resource it tests, within the existing run deadline.
+- **Package contents:** `npm pack --dry-run` lists 570 files under the `files` allowlist, twelve more than 0.12.2 (the
+  compiled `apply` modules, and `web-api-core/provided-types`): no tests, fixtures, environment files or credentials.
 - **Supply chain:** `npm audit --omit=dev` across the repository still reports `zod`
   ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high) and `@hono/node-server`
   ([GHSA-qv5m-9pm6-hqp3](https://github.com/advisories/GHSA-qv5m-9pm6-hqp3),
@@ -38,7 +43,7 @@ already open, its check of the review pool, and `fast-xml-parser` 5.12.0.
 ### Method
 
 Review of every change since 0.12.2 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the
-listed files, the full test suite (3,498 tests across 8 packages, 2,365 in this package), and the command run end to
+listed files, the full test suite (3,511 tests across 8 packages, 2,378 in this package), and the command run end to
 end against a local instance of the certification services: a dry run, a save, a re-run that changed nothing, and a
 review-pool row put right after a comment-only save had cleared it.
 

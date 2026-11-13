@@ -34,6 +34,21 @@
 
 ## Certification 0.12.3 – 2026-11-12
 
+### Web API Core tests every Data Dictionary resource, and requires the types the server has
+
+- **Every RESO resource by default:** a run that names no resources tests every resource the server declares that the
+  Data Dictionary defines. Before, it tested six listing resources (Property, Member, Office, Media, OpenHouse, Showing),
+  so resources such as PropertyRooms, Teams or Lookup went untested, and a server serving none of the six was asked for
+  nothing. `--resources` still narrows the run, and a local resource is tested only when named.
+- **Full type coverage is required:** a data type the server provides on a resource tested must be met, or the run
+  fails and names the fields that provide it. A type the server provides nowhere is recorded, and the run can still be
+  certified. Before, a missing type failed the run only with `--full-coverage`. `report-detailed.json` lists the
+  missing types the server provides in `typeCoverage.providedNotMet`.
+- **`--full-coverage` is the strict mode:** every type must be met, none excused. With one resource named, it tests as
+  Core 2.0.0 did.
+- **A run with nothing to request says why:** "No resource returned any records" now names the cause when the metadata
+  declares none of the resources the run asks for, and coverage reads "not measured" when no record was tested.
+
 ### RESO staff can apply review answers from a sheet, as a merge
 
 - **`reso-cert apply-variation-decisions`** applies a sheet of actions and comments (the one
