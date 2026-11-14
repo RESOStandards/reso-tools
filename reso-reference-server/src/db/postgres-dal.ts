@@ -19,7 +19,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandOptions } from './expand-options.js';
+import { applyExpandOptions, nestedCollectionFilter } from './expand-options.js';
 import { filterToSql } from './filter-to-sql.js';
 import { deserializeRow } from './queries.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
@@ -343,10 +343,11 @@ const resolveChildExpand = async (
   // For each nav binding, issue a batch query and group by child key
   const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
 
-  for (const { binding } of expandBindings) {
+  for (const { binding, expandExpr } of expandBindings) {
     const fk = binding.foreignKey;
     const targetFields = binding.targetFields.filter(f => !f.isExpansion);
     const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
+    const nestedFilter = nestedCollectionFilter(binding, expandExpr);
 
     let sql: string;
     let values: unknown[];
@@ -363,6 +364,12 @@ const resolveChildExpand = async (
       const targetCol = fk.targetColumn ?? childCtx.keyField;
       sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${targetCol}" = ANY($1)`;
       values = [childKeys];
+    }
+
+    if (nestedFilter) {
+      const filterSql = filterToSql(nestedFilter, binding.targetFields, `"${binding.targetResource}"`, values.length + 1);
+      sql = `${sql} AND (${filterSql.where})`;
+      values = [...values, ...filterSql.values];
     }
 
     const result = await pool.query(sql, values);
@@ -533,10 +540,21 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
       // Build nav SELECT columns and JOIN clauses against the CTE
       const outerNavCols: string[] = [];
       const outerJoinClauses: string[] = [];
-      for (const { binding, alias: navAlias } of expandBindings) {
+      for (const { binding, alias: navAlias, expandExpr } of expandBindings) {
         outerNavCols.push(...buildNavSelectColumns(binding, navAlias));
+        // A $filter inside the expansion narrows the joined children, through the same translator as a top-level
+        // $filter, numbered after the page's parameters.
+        const nestedFilter = nestedCollectionFilter(binding, expandExpr);
+        const filterSql = nestedFilter ? filterToSql(nestedFilter, binding.targetFields, navAlias, paramIndex) : undefined;
+        if (filterSql) {
+          values.push(...filterSql.values);
+          paramIndex += filterSql.values.length;
+        }
         // Join against CTE using the aliased key column: parent_page."p.ListingKey"
-        outerJoinClauses.push(buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias));
+        outerJoinClauses.push(
+          buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias) +
+            (filterSql ? ` AND (${filterSql.where})` : '')
+        );
       }
 
       // The outer query keeps the page's order: the client's columns, then the key (stable-order.ts).

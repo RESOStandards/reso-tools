@@ -33,7 +33,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyMongoExpandOptions } from './expand-options.js';
+import { applyMongoExpandOptions, nestedCollectionFilter } from './expand-options.js';
 import { filterToMongo } from './filter-to-mongo.js';
 import { coerceServedInteger } from './queries.js';
 
@@ -99,8 +99,10 @@ const batchExpandNavigation = async (
   // For each navigation property, fetch all related documents in one query
   const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
 
-  for (const { binding } of bindings) {
+  for (const { binding, expr } of bindings) {
     const collection = db.collection(binding.targetResource);
+    // A $filter inside the expansion narrows the children, through the same translator as a top-level $filter.
+    const nestedFilter = nestedCollectionFilter(binding, expr);
     const fk = binding.foreignKey;
 
     // Build projection for target fields — exclude _id and expansion fields (lazy via $expand)
@@ -145,7 +147,8 @@ const batchExpandNavigation = async (
       filter = { [targetCol]: { $in: parentKeys } };
     }
 
-    const docs = await collection.find(filter, { projection: navProjection }).toArray();
+    const query = nestedFilter ? { $and: [filter, filterToMongo(nestedFilter, binding.targetFields).query] } : filter;
+    const docs = await collection.find(query, { projection: navProjection }).toArray();
 
     const grouped = new Map<string, Record<string, unknown>[]>();
     for (const doc of docs) {

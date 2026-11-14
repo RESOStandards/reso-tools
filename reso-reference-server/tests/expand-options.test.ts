@@ -420,14 +420,14 @@ describe('applyExpandOptions – ordering, paging and counting (#440)', () => {
 });
 
 describe('unsupportedExpandOptions (#440)', () => {
-  it('names each $filter and $levels inside $expand with its path, at any depth', () => {
+  it('names each $search and $levels inside $expand with its path, at any depth; $filter is applied, not refused', () => {
     expect(
       unsupportedExpandOptions([
-        { property: 'Media', options: { $filter: "MediaType eq 'Jpeg'" } },
+        { property: 'Media', options: { $search: 'kitchen', $filter: "MediaType eq 'Jpeg'" } },
         { property: 'ListOffice', options: { $expand: [{ property: 'Members', options: { $levels: 2 } }] } },
         { property: 'Rooms', options: { $top: 2 } }
       ])
-    ).toEqual(['$filter inside $expand=Media', '$levels inside $expand=ListOffice/Members']);
+    ).toEqual(['$search inside $expand=Media', '$levels inside $expand=ListOffice/Members']);
     expect(unsupportedExpandOptions(undefined)).toEqual([]);
   });
 });

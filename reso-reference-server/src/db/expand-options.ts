@@ -1,10 +1,13 @@
 /**
- * Query options inside `$expand`, applied to the expanded entities once a data layer has stitched them into their
- * parents: `$orderby`, `$skip`, `$top`, `$count` and `$select` (OData 4.01 URL Conventions, Section 5.1.3). One step
- * for every backend, so SQLite, PostgreSQL and MongoDB answer the same way.
+ * Query options inside `$expand` (OData 4.01 URL Conventions, Section 5.1.3).
  *
- * `$filter` and `$levels` inside an expansion are not implemented. The handlers answer 501 for them (OData 4.01
- * Protocol, Section 9.3.1) rather than return the unfiltered collection as if it were filtered.
+ * `$filter` is applied where the children are fetched, by each backend's own filter translator, so it means inside an
+ * expansion exactly what it means at the top level (nestedCollectionFilter). `$orderby`, `$skip`, `$top`, `$count` and
+ * `$select` are applied here, once the children are stitched into their parents, in one step for every backend, so
+ * SQLite, PostgreSQL and MongoDB answer the same way.
+ *
+ * `$search` and `$levels` inside an expansion are not implemented. The handlers answer 501 for them (OData 4.01
+ * Protocol, Section 9.3.1) rather than answer as if they had been applied.
  */
 
 import type { ExpandExpression } from '@reso-standards/odata-expression-parser';
@@ -41,11 +44,24 @@ export const isExpandOptionError = (err: unknown): err is Error => err instanceo
 export const unsupportedExpandOptions = (tree: ReadonlyArray<ExpandExpression> | undefined, path = ''): ReadonlyArray<string> =>
   (tree ?? []).flatMap(expr => {
     const at = path ? `${path}/${expr.property}` : expr.property;
-    const own = (['$filter', '$levels'] as const)
+    const own = (['$search', '$levels'] as const)
       .filter(option => expr.options[option] !== undefined)
       .map(option => `${option} inside $expand=${at}`);
     return [...own, ...unsupportedExpandOptions(expr.options.$expand, at)];
   });
+
+/**
+ * The `$filter` to apply where an expansion's children are fetched, or undefined. A filter narrows a collection; on a
+ * single-valued navigation property it is a client error, not a way to make the related entity disappear.
+ */
+export const nestedCollectionFilter = (binding: NavigationPropertyBinding, expandExpr: ExpandExpression): string | undefined => {
+  const filter = expandExpr.options.$filter;
+  if (filter === undefined) return undefined;
+  if (!binding.isCollection) {
+    throw expandOptionError(`$filter inside $expand=${binding.name} applies to a collection; ${binding.name} is single-valued`);
+  }
+  return filter;
+};
 
 const NUMERIC_TYPES = new Set(['Edm.Byte', 'Edm.SByte', 'Edm.Int16', 'Edm.Int32', 'Edm.Int64', 'Edm.Decimal', 'Edm.Double', 'Edm.Single']);
 const TEMPORAL_TYPES = new Set(['Edm.Date', 'Edm.DateTimeOffset', 'Edm.TimeOfDay']);

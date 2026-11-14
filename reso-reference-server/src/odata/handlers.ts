@@ -16,6 +16,10 @@ const isFilterError = (err: unknown): err is Error =>
 /** A client error in `$expand` or in an option inside it: answered 400. */
 const isExpandClientError = (err: unknown): err is Error => err instanceof ExpandParseError || isExpandOptionError(err);
 
+/** Any client error in the query, a `$filter` inside an expansion included: answered 400, never 500. */
+const isQueryClientError = (err: unknown): err is Error =>
+  isExpandClientError(err) || err instanceof ParseError || err instanceof LexerError || isFilterError(err);
+
 /**
  * Answer 501 for query functionality the server does not implement, naming each piece (OData 4.01 Protocol, Section
  * 9.3.1), instead of answering as if it had been applied. Returns true when it answered.
@@ -155,7 +159,7 @@ export const readHandler =
       });
     } catch (err) {
       setODataHeaders(res);
-      if (isExpandClientError(err)) {
+      if (isQueryClientError(err)) {
         res.status(400).json(buildODataError('40000', err.message, [{ target: '$expand', message: err.message }], 'Read'));
         return;
       }
@@ -192,12 +196,12 @@ export const navigationPropertyHandler =
       }
 
       // Resolve the parent + its navigation property via the same $expand machinery. The path's query options become
-      // the expansion's options, so /Property('k')/Media?$select=MediaKey&$orderby=Order&$top=10 works. $filter and
-      // $search on the path are not implemented: 501, never an unfiltered answer.
+      // the expansion's options, so /Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10 works. $search on
+      // the path is not implemented: 501, never an answer as if it had been applied.
       if (
         answeredNotImplemented(
           res,
-          (['$filter', '$search'] as const)
+          (['$search'] as const)
             .filter(option => req.query[option] !== undefined)
             .map(option => `${option} on /${ctx.resourceCtx.resource}('key')/${binding.name}`),
           'Read'
@@ -219,6 +223,7 @@ export const navigationPropertyHandler =
             property: binding.name,
             options: {
               ...(query.$select !== undefined ? { $select: query.$select } : {}),
+              ...(query.$filter !== undefined ? { $filter: query.$filter } : {}),
               ...(query.$orderby !== undefined ? { $orderby: query.$orderby } : {}),
               ...(top !== undefined ? { $top: top } : {}),
               ...(skip !== undefined ? { $skip: skip } : {}),
@@ -263,7 +268,7 @@ export const navigationPropertyHandler =
       });
     } catch (err) {
       setODataHeaders(res);
-      if (isExpandClientError(err)) {
+      if (isQueryClientError(err)) {
         res.status(400).json(buildODataError('40000', err.message, [{ target: binding.name, message: err.message }], 'Read'));
         return;
       }

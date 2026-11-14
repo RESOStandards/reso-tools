@@ -23,7 +23,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandOptions } from './expand-options.js';
+import { applyExpandOptions, nestedCollectionFilter } from './expand-options.js';
 import { filterToSqlite } from './filter-to-sqlite.js';
 import { coerceServedInteger, deserializeRow } from './queries.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
@@ -333,10 +333,11 @@ const resolveChildExpand = (
   const navResults = new Map<string, Map<string, Record<string, unknown>[]>>();
   const placeholders = childKeys.map(() => '?').join(', ');
 
-  for (const { binding } of expandBindings) {
+  for (const { binding, expandExpr } of expandBindings) {
     const fk = binding.foreignKey;
     const targetFields = binding.targetFields.filter(f => !f.isExpansion);
     const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
+    const nestedFilter = nestedCollectionFilter(binding, expandExpr);
 
     let sql: string;
     let values: unknown[];
@@ -354,6 +355,12 @@ const resolveChildExpand = (
       const targetCol = fk.targetColumn ?? childCtx.keyField;
       sql = `SELECT ${selectCols} FROM "${binding.targetResource}" WHERE "${targetCol}" IN (${placeholders})`;
       values = childKeys;
+    }
+
+    if (nestedFilter) {
+      const filterSql = filterToSqlite(nestedFilter, binding.targetFields, `"${binding.targetResource}"`);
+      sql = `${sql} AND (${filterSql.where})`;
+      values = [...values, ...filterSql.values];
     }
 
     const rows = database.prepare(sql).all(...values) as Record<string, unknown>[];
@@ -503,9 +510,17 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
 
       const outerNavCols: string[] = [];
       const outerJoinClauses: string[] = [];
-      for (const { binding, alias: navAlias } of expandBindings) {
+      for (const { binding, alias: navAlias, expandExpr } of expandBindings) {
         outerNavCols.push(...buildNavSelectColumns(binding, navAlias));
-        outerJoinClauses.push(buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias));
+        // A $filter inside the expansion narrows the joined children, through the same translator as a top-level
+        // $filter. Its parameters follow the page's in the SQL text, so they follow them in values.
+        const nestedFilter = nestedCollectionFilter(binding, expandExpr);
+        const filterSql = nestedFilter ? filterToSqlite(nestedFilter, binding.targetFields, navAlias) : undefined;
+        if (filterSql) values.push(...filterSql.values);
+        outerJoinClauses.push(
+          buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias) +
+            (filterSql ? ` AND (${filterSql.where})` : '')
+        );
       }
 
       // The outer query keeps the page's order: the client's columns, then the key (stable-order.ts).
