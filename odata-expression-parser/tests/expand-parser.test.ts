@@ -223,3 +223,35 @@ describe('parseExpand', () => {
     });
   });
 });
+
+// reso-tools #440: an option's value is what it says, or the expansion is refused.
+describe('parseExpand – option values (#440)', () => {
+  it('refuses an empty value rather than reading it as zero or nothing', () => {
+    expect(() => parseExpand('Media($top=)')).toThrow(ExpandParseError);
+    expect(() => parseExpand('Media($skip=)')).toThrow(ExpandParseError);
+    expect(() => parseExpand('Media($filter=)')).toThrow(/has no value/);
+    expect(() => parseExpand('Media($select=)')).toThrow(/has no value/);
+  });
+
+  it('takes a count only as digits, so 1e2, 2.0 and -1 are refused', () => {
+    for (const value of ['1e2', '2.0', '-1', '0x10', ' ']) expect(() => parseExpand(`Media($top=${value})`)).toThrow(ExpandParseError);
+    expect(parseExpand('Media($top=0)')[0].options.$top).toBe(0);
+    expect(parseExpand('Media($skip=12)')[0].options.$skip).toBe(12);
+  });
+
+  it('takes $levels as a positive count or max', () => {
+    expect(parseExpand('Rooms($levels=2)')[0].options.$levels).toBe(2);
+    expect(parseExpand('Rooms($levels=max)')[0].options.$levels).toBe('max');
+    expect(() => parseExpand('Rooms($levels=0)')).toThrow(ExpandParseError);
+  });
+
+  it('takes $count only as true or false', () => {
+    expect(parseExpand('Media($count=true)')[0].options.$count).toBe(true);
+    expect(parseExpand('Media($count=false)')[0].options.$count).toBe(false);
+    expect(() => parseExpand('Media($count=yes)')).toThrow(/true or false/);
+  });
+
+  it('reads $search, which OData allows inside an expansion, so a server can say it is not implemented', () => {
+    expect(parseExpand('Media($search=kitchen)')[0].options.$search).toBe('kitchen');
+  });
+});

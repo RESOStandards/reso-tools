@@ -65,7 +65,16 @@ const parseExpandOptions = (optionsStr: string, basePosition: number): ExpandQue
     $count?: boolean;
     $expand?: ReadonlyArray<ExpandExpression>;
     $levels?: number | 'max';
+    $search?: string;
   } = {};
+
+  // A count is digits only: Number('') is 0 and Number('1e2') is 100, so Number alone would accept "$top=" as $top=0.
+  const count = (option: string, value: string, minimum: number): number => {
+    if (!/^\d+$/.test(value) || Number(value) < minimum) {
+      throw new ExpandParseError(`Invalid ${option} value: "${value}"`, basePosition);
+    }
+    return Number(value);
+  };
 
   for (const segment of segments) {
     const eqIdx = segment.indexOf('=');
@@ -75,6 +84,9 @@ const parseExpandOptions = (optionsStr: string, basePosition: number): ExpandQue
 
     const key = segment.slice(0, eqIdx).trim();
     const value = segment.slice(eqIdx + 1).trim();
+    if (value === '') {
+      throw new ExpandParseError(`Expand option ${key} has no value`, basePosition);
+    }
 
     switch (key) {
       case '$select':
@@ -86,39 +98,26 @@ const parseExpandOptions = (optionsStr: string, basePosition: number): ExpandQue
       case '$orderby':
         options.$orderby = value;
         break;
-      case '$top': {
-        const n = Number(value);
-        if (!Number.isInteger(n) || n < 0) {
-          throw new ExpandParseError(`Invalid $top value: "${value}"`, basePosition);
-        }
-        options.$top = n;
+      case '$top':
+        options.$top = count('$top', value, 0);
         break;
-      }
-      case '$skip': {
-        const n = Number(value);
-        if (!Number.isInteger(n) || n < 0) {
-          throw new ExpandParseError(`Invalid $skip value: "${value}"`, basePosition);
-        }
-        options.$skip = n;
+      case '$skip':
+        options.$skip = count('$skip', value, 0);
         break;
-      }
       case '$count':
+        if (value !== 'true' && value !== 'false') {
+          throw new ExpandParseError(`Invalid $count value: "${value}" (true or false)`, basePosition);
+        }
         options.$count = value === 'true';
+        break;
+      case '$search':
+        options.$search = value;
         break;
       case '$expand':
         options.$expand = parseExpandClauses(value, basePosition);
         break;
       case '$levels':
-        options.$levels =
-          value === 'max'
-            ? 'max'
-            : (() => {
-                const n = Number(value);
-                if (!Number.isInteger(n) || n < 1) {
-                  throw new ExpandParseError(`Invalid $levels value: "${value}"`, basePosition);
-                }
-                return n;
-              })();
+        options.$levels = value === 'max' ? 'max' : count('$levels', value, 1);
         break;
       default:
         throw new ExpandParseError(`Unknown expand option: "${key}"`, basePosition);
