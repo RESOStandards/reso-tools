@@ -4,6 +4,54 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.13.0 Security Notes – 2026-11-13
+
+Pre-publish review of `@reso-standards/reso-certification` 0.13.0, covering every change since 0.12.3: `analytics
+compare` and the functions behind it, `ask`, and wording changes to comments and guides.
+
+### Findings Addressed
+
+- **`ask` followed a redirect.** As merged, `reso-cert ask` sent its request with fetch's default, which follows a
+  redirect. The request carries the credential, and a 307 or 308 keeps the method and the body, so a redirect would
+  have sent the question, and possibly the credential, to whatever host it named. It now refuses a redirect and
+  reports the status, as the token exchange, `restore`, `archive-report` and the cloud upload already do. 0.13.0 is the
+  first release with `ask`, so no published version carried this.
+
+### Checked and Clean
+
+- **What `analytics compare` reads and sends:** it reads the two runs' reports from disk. Without a second run, it
+  looks only in the given run's own `archived` folder and takes the newest earlier run there that has a metadata
+  report. It makes no network request, reads no credential and writes nothing; the output is metric values and the
+  two runs' paths.
+- **What it changes in a certification:** nothing. The module is new, nothing on the path that decides a run's outcome
+  imports it, and the change adds lines only. The test suite passes unchanged apart from the new tests.
+- **Where `ask` sends the credential:** only as the bearer to the Assistant's address, which is https (an http address
+  is upgraded to https unless it is a loopback address) and is an origin with an optional path, never a query or a fragment. The
+  token is minted by the existing client credentials exchange, which refuses a redirect. The credential never appears
+  in an error message, including when the network fails.
+- **How the carried modules load:** `rcf-command`, `schema-command` and `variations-v2/compute` import the carried
+  CommonJS statically instead of through `createRequire` with a path, so a bundled copy includes it. Each import gives
+  the same module object the `require` did (checked against the built package), so nothing they do changes.
+- **Package contents:** `npm pack --dry-run` lists 598 files under the `files` allowlist, 28 more than 0.12.3: the
+  compiled `analytics` modules, `assistant/ask`, and the two commands. No tests, fixtures, environment files or
+  credentials.
+- **Supply chain:** no dependency changed since 0.12.3. `npm audit --omit=dev` across the repository reports `zod`
+  ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high), `@hono/node-server`
+  ([GHSA-qv5m-9pm6-hqp3](https://github.com/advisories/GHSA-qv5m-9pm6-hqp3),
+  [GHSA-jpvv-r467-5p4w](https://github.com/advisories/GHSA-jpvv-r467-5p4w), moderate) and, newly published, five
+  advisories against `hono` 4.13.13 (four moderate, one low, the most recent
+  [GHSA-4h7h-rv7c-7m2v](https://github.com/advisories/GHSA-4h7h-rv7c-7m2v)). All three reach the repository only
+  through the MCP server's `@modelcontextprotocol/sdk`; none is a dependency of this package or of the desktop app.
+  They are fixed with the MCP server's update.
+
+### Method
+
+Review of every change since 0.12.3 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the
+listed files, the full test suite (3,554 tests across 8 packages, 2,421 in this package), `analytics compare` run on
+two Data Dictionary runs of the reference server, the redirect test watched failing before the fix, and a bundled engine loaded and compared two runs.
+
+---
+
 ## Certification 0.12.3 Security Notes – 2026-11-12
 
 Pre-publish review of `@reso-standards/reso-certification` 0.12.3, covering every change since 0.12.2: the

@@ -76,6 +76,7 @@ import {
 import { submitVariationsReportViaService } from '../variations/submit.js';
 import type { ODataVersion } from '../xsd/validate-csdl.js';
 import { addEditSelectionOf } from './add-edit-options.js';
+import { compareExitCode, renderComparisonText, runCompare } from './analytics-command.js';
 import { formatApplyItems, summarizeApplyPlan } from './apply-command.js';
 import { type ArchiveReportResult, archiveExitCode, runArchiveReport } from './archive-report-command.js';
 import { askExitCode, renderAnswer, runAsk, withoutRepeats } from './ask-command.js';
@@ -2373,6 +2374,32 @@ program
     } catch (error) {
       console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
       process.exitCode = askExitCode(error);
+    }
+  });
+
+// RESO Analytics: what a provider's runs show over time. Read-only, from run directories on disk; nothing is sent.
+const analyticsCmd = program
+  .command('analytics')
+  .description('RESO Analytics: how your certification runs change over time. Reads runs on disk; sends nothing.');
+
+analyticsCmd
+  .command('compare')
+  .description(
+    'Compare a Data Dictionary run with the run before it: what changed, by how much, and whether it is better or worse. ' +
+      'Exit code 0 when compared, 1 when there is no earlier run, 2 on any other error.'
+  )
+  .argument('<run>', 'The run directory: …/current, …/archived/<timestamp>, or any directory holding a run’s reports')
+  .argument('[previous]', 'The run to compare with. Default: the previous run of the same connection, from …/archived')
+  .option('--json', 'Print the whole comparison as JSON, for scripts and agents')
+  .option('--all', 'Show every metric for every resource, not only the ones that changed')
+  .action(async (run: string, previous: string | undefined, opts: { json?: boolean; all?: boolean }) => {
+    try {
+      const comparison = await runCompare({ run, ...(previous === undefined ? {} : { previous }) });
+      console.log(opts.json ? JSON.stringify(comparison, null, 2) : renderComparisonText(comparison, { all: Boolean(opts.all) }));
+      process.exitCode = compareExitCode();
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error));
+      process.exitCode = compareExitCode(error);
     }
   });
 

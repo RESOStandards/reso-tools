@@ -659,6 +659,31 @@ sources it drew on. `--json` prints the same as one object for scripts. The Assi
 address comes with access; to ask for access, write to dev+assistant@reso.org. See
 [`ask`](https://tools.reso.org/packages/reso-certification/cli/#ask) in the CLI reference for every option.
 
+## Comparing a Run with the One Before
+
+Each Data Dictionary run writes its reports to `…/current`, and the run before it moves to `…/archived/<timestamp>`.
+To see what changed between them:
+
+```bash
+reso-cert analytics compare .reso-cert/data-dictionary-2.1/<providerUoi>-<providerUsi>/<recipientUoi>/current
+```
+
+The comparison covers field and lookup standardization, fields with data, standard field availability, response
+times, throughput and schema validation results, across all resources and for each one. Each line says how the value
+changed and whether that is better or worse:
+
+```text
+  Field standardization  61.0% → 66.0%   up 5.0 points  better
+  Average response time  42.0 ms → 37.0 ms  11.9% faster  better
+```
+
+Rates change in points, performance in percent, and a timing within 5% of the previous run's counts as the same,
+because the same server answers a little faster or slower from run to run. Give a second directory to compare any two
+runs, `--all` for every metric of every resource, or `--json` for the whole comparison as one object for scripts and AI
+agents. Both runs are read from disk; nothing is sent. The RESO desktop app shows the same comparison from a run's
+**Compare** button. See
+[`analytics compare`](https://tools.reso.org/packages/reso-certification/cli/#analytics-compare) in the CLI reference.
+
 ## Choosing the Output Format
 
 The default output is a progress display with spinners – good for interactive runs where a human is watching. For everything else, there are three other formats:

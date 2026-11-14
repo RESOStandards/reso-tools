@@ -4,13 +4,6 @@
 
 ## Unreleased
 
-### Ask RESO's Assistant from the command line
-
-- **`reso-cert ask`** sends a question to RESO's Assistant with the credential in your `credentials.env`, shows the
-  Assistant's progress while it works, and prints the answer, any statements a reviewer could not confirm, and the
-  sources. `--json` prints one object for scripts.
-- The Assistant is in a closed beta. Its address comes with access: `--origin`, or `RESO_ASSISTANT_ORIGIN`.
-
 ### The reference server can serve your own resources, read-only
 
 - **`RESOURCES`** chooses the resources a deployment serves, by name. Define them in the metadata file and list them
@@ -36,6 +29,40 @@
   forwarded to.
 - **Keeping the earlier behavior:** `ALLOW_ANY_SERVICE_ROOT=true` forwards to any http(s) URL as before, with a warning
   at every start.
+
+---
+
+## Certification 0.13.0 – 2026-11-13
+
+### Compare a run with the one before it (RESO Analytics)
+
+- **`reso-cert analytics compare <run> [previous]`** compares a Data Dictionary run with the run before it: field and
+  lookup standardization, fields with data, standard field availability, records sampled, response times, response
+  size, throughput and schema validation results, across all resources and for each one. The counts and availability
+  are the ones the certification site shows for the same runs. Without a second run it compares with the previous run
+  of the same connection, from `…/archived`. Both runs are read from disk; nothing is sent.
+- Rates change in points, performance and size in percent, and a timing within 5% of the previous run's counts as the
+  same. Each line ends with its verdict: better, worse, changed, same, new or gone.
+- `--json` prints the whole comparison (`schemaVersion` 1) for scripts and AI agents; `--all` shows every metric of every
+  resource. Exit codes: 0 compared, 1 no earlier run, 2 anything else.
+- **SDK:** `readRunMetrics`, `compareRunMetrics`, `compareRuns`, `findPreviousRun` and `renderComparisonText`, so another
+  tool can show the same comparison. The RESO desktop app's Compare page uses them.
+
+### Ask RESO's Assistant from the command line
+
+- **`reso-cert ask`** sends a question to RESO's Assistant with the credential in your `credentials.env`, shows the
+  Assistant's progress while it works, and prints the answer, any statements a reviewer could not confirm, and the
+  sources. `--json` prints one object for scripts.
+- The Assistant is in a closed beta. Its address comes with access: `--origin`, or `RESO_ASSISTANT_ORIGIN`.
+- `reso-cert ask` never follows a redirect: the request carries the credential, so a 3xx is reported as a failure
+  rather than followed to another host, as the token exchange and `restore` already do.
+
+### A bundled engine loads again
+
+- From 0.12.0, the engine failed to load when bundled into one file, as the RESO desktop app bundles it. Three modules
+  loaded the carried CommonJS through a path computed at run time, which a bundler cannot follow, so in a bundle the
+  path pointed beside the bundle file. They now load it by static import, which gives the same modules, and a test
+  fails if any module loads a file that way again. Run from `node_modules`, as the CLI runs, nothing changes.
 
 ---
 

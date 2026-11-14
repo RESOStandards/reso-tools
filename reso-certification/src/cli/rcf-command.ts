@@ -14,10 +14,11 @@
  * (the payload stream and a bearer token), so it is unit-testable without a filesystem or network.
  */
 
-import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
+// @ts-expect-error — legacy CJS (reference metadata loader)
+import certUtilsEtl from '../etl/index.cjs';
+// @ts-expect-error — legacy CJS
+import certUtilsCommon from '../legacy/common.js';
 import { type RcfInference, type ReferenceMap, createRcfInference } from '../rcf/index.js';
 import { CURRENT_DD_VERSION, SUPPORTED_DD_VERSIONS, isSupportedDDVersion, normalizeDDVersion } from '../sdk/dd-versions.js';
 import {
@@ -30,11 +31,10 @@ import {
 import { type RcfPayload, readRcfPayloads } from './rcf-input.js';
 import { type DdSchemaValidator, createDdSchemaValidator } from './schema-command.js';
 
-const requireCjs = createRequire(import.meta.url);
-const here = dirname(fileURLToPath(import.meta.url));
 // getReferenceMetadata + buildMetadataMap are shared v2 utilities (reference DD metadata), not RCF inference.
-const { getReferenceMetadata } = requireCjs(resolve(here, '../etl/index.cjs')) as { getReferenceMetadata: (v: string) => unknown };
-const { buildMetadataMap } = requireCjs(resolve(here, '../legacy/common.js')) as {
+// Static imports, so a bundler includes them: a path computed at run time from import.meta.url points beside the bundle.
+const { getReferenceMetadata } = certUtilsEtl as { getReferenceMetadata: (v: string) => unknown };
+const { buildMetadataMap } = certUtilsCommon as {
   buildMetadataMap: (r: unknown) => { metadataMap: ReferenceMap };
 };
 
