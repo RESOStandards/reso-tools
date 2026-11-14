@@ -1,3 +1,4 @@
+import { searchParseError } from '@reso-standards/odata-expression-parser';
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import type { DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../src/db/data-access.js';
@@ -181,16 +182,29 @@ describe('navigationPropertyHandler – query options on the path (#440)', () =>
     expect(res._status).toBe(200);
   });
 
-  it('answers 501 for $search on the path, without reading anything', async () => {
+  it('passes $search on the path to the expansion, where the backend applies it (#442)', async () => {
     const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
     const res = makeRes();
     await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
-      makeReq("/Property('L1')/Media", { $search: 'kitchen' }) as Request,
+      makeReq("/Property('L1')/Media", { $search: 'kitchen', $filter: "MediaType eq 'Jpeg'" }) as Request,
       res as unknown as Response,
       vi.fn()
     );
-    expect(res._status).toBe(501);
-    expect(JSON.stringify(res._body)).toMatch(/\$search on \/Property\('key'\)\/Media/);
+    expect(vi.mocked(dal.readByKey).mock.calls[0][2]).toEqual({
+      $expand: [{ property: 'Media', options: { $filter: "MediaType eq 'Jpeg'", $search: 'kitchen' } }]
+    });
+    expect(res._status).toBe(200);
+  });
+
+  it('answers 400 for $search given twice, without reading anything (#442)', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
+    const res = makeRes();
+    await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
+      makeReq("/Property('L1')/Media", { $search: ['kitchen', 'bath'] } as unknown as Record<string, string>) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(400);
     expect(dal.readByKey).not.toHaveBeenCalled();
   });
 
@@ -207,17 +221,29 @@ describe('navigationPropertyHandler – query options on the path (#440)', () =>
 });
 
 describe('readHandler and collectionHandler – options inside $expand (#440)', () => {
-  it('answers 501 for $search inside $expand on a single read, naming it, without reading anything', async () => {
+  it('answers 501 for $levels inside $expand on a single read, naming it, without reading anything', async () => {
     const dal = makeDal(() => ({ ListingKey: 'L1' }));
+    const res = makeRes();
+    await readHandler(makeCtx(dal))(
+      makeReq("/Property('L1')", { $expand: 'Media($levels=2)' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(501);
+    expect(JSON.stringify(res._body)).toMatch(/\$levels inside \$expand=Media/);
+    expect(dal.readByKey).not.toHaveBeenCalled();
+  });
+
+  it('passes $search inside $expand on a single read to the backend (#442)', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
     const res = makeRes();
     await readHandler(makeCtx(dal))(
       makeReq("/Property('L1')", { $expand: 'Media($search=kitchen)' }) as Request,
       res as unknown as Response,
       vi.fn()
     );
-    expect(res._status).toBe(501);
-    expect(JSON.stringify(res._body)).toMatch(/\$search inside \$expand=Media/);
-    expect(dal.readByKey).not.toHaveBeenCalled();
+    expect(vi.mocked(dal.readByKey).mock.calls[0][2]?.$expand?.[0].options.$search).toBe('kitchen');
+    expect(res._status).toBe(200);
   });
 
   it('answers 400, not 500, when a $filter inside $expand names a field the expanded resource lacks', async () => {
@@ -252,6 +278,44 @@ describe('readHandler and collectionHandler – options inside $expand (#440)', 
       vi.fn()
     );
     expect(res._status).toBe(501);
+    expect(dal.queryCollection).not.toHaveBeenCalled();
+  });
+});
+
+// reso-tools #442 – $search on a collection reaches the backend, stays on the next page, and a malformed one is a 400.
+describe('collectionHandler – $search (#442)', () => {
+  const pagedReq = (query: Record<string, string>): Request =>
+    ({ path: '/Property', query, headers: { prefer: 'odata.maxpagesize=1' } }) as unknown as Request;
+
+  it('passes $search to the backend and carries it in the next link', async () => {
+    const dal = makeDal(() => undefined);
+    vi.mocked(dal.queryCollection).mockResolvedValueOnce({ value: [{ ListingKey: 'L1' }] });
+    const res = makeRes();
+    await collectionHandler(makeCtx(dal))(pagedReq({ $search: '"business case" OR roadmap' }), res as unknown as Response, vi.fn());
+    expect(vi.mocked(dal.queryCollection).mock.calls[0][1]?.$search).toBe('"business case" OR roadmap');
+    expect(res._status).toBe(200);
+    const next = new URL(String(res._body['@odata.nextLink']));
+    expect(next.searchParams.get('$search')).toBe('"business case" OR roadmap');
+  });
+
+  it('answers 400 naming $search when the expression is malformed', async () => {
+    const dal = makeDal(() => undefined);
+    vi.mocked(dal.queryCollection).mockRejectedValueOnce(searchParseError('Unmatched "(" in $search: (roadmap'));
+    const res = makeRes();
+    await collectionHandler(makeCtx(dal))(makeReq('/Property', { $search: '(roadmap' }) as Request, res as unknown as Response, vi.fn());
+    expect(res._status).toBe(400);
+    expect(JSON.stringify(res._body)).toMatch(/"target":"\$search"/);
+  });
+
+  it('answers 400 for $search given twice, without querying', async () => {
+    const dal = makeDal(() => undefined);
+    const res = makeRes();
+    await collectionHandler(makeCtx(dal))(
+      makeReq('/Property', { $search: ['a', 'b'] } as unknown as Record<string, string>) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(400);
     expect(dal.queryCollection).not.toHaveBeenCalled();
   });
 });

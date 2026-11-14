@@ -23,12 +23,22 @@
 - Ordering follows the field's type, puts nulls first in ascending order and last in descending order (OData 4.01 Protocol), and breaks ties by key, so a page is the same page every time.
 - `$count=true` adds `<NavigationProperty>@odata.count`, the size of the filtered collection before paging.
 - The same options apply on a navigation path: `/Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10&$count=true`.
-- **Behavior change:** `$search` and `$levels` inside an expansion, and `$search` on a navigation path, answer **501 Not Implemented**, naming each one (OData 4.01 Protocol, Section 9.3.1). A malformed `$expand`, or a `$filter` inside one that names an unknown field, answers 400 on every route, not 500.
+- **Behavior change:** `$levels` inside an expansion answers **501 Not Implemented**, naming it (OData 4.01 Protocol, Section 9.3.1). A malformed `$expand`, or a `$filter` inside one that names an unknown field, answers 400 on every route, not 500.
+
+### The reference server supports `$search`
+
+- `$search` narrows a collection to the records that match it (OData 4.01 URL Conventions, Section 5.1.7). Before, it was ignored: `/Media?$search=roadmap` returned every record.
+- A record matches a word or phrase when one of its plain text fields contains it, ignoring case. Plain text means every `Edm.String` field that is not the key, a collection or a lookup; lookup fields are matched exactly with `$filter`.
+- Words and double-quoted phrases combine with `NOT`, `AND` (or a space) and `OR`, grouped with parentheses. A single-quoted expression is read as one phrase, for type-ahead.
+- It applies at the top level, inside `$expand` and on a navigation path. With `$filter`, a record has to match both. `$count` counts what matches, and the next link carries the search.
+- SQLite, PostgreSQL and MongoDB answer a search the same way, with plain containment rather than each engine's full-text search, whose word stemming differs. Case folding beyond ASCII follows the engine.
+- A malformed expression, or `$search` given twice, answers 400.
 
 ### The expression parser reads an option's value strictly
 
 - **Behavior change:** inside `$expand`, `$top`, `$skip` and `$levels` take digits only, `$count` takes `true` or `false`, and an option with no value is refused. Before, `$top=` read as `$top=0`, `$top=1e2` as 100, and `$count=yes` as false.
-- `$search` inside an expansion is read, so a server can answer that it does not implement it instead of rejecting it as unknown.
+- `$search` inside an expansion is read, so a server can apply it instead of rejecting it as unknown.
+- **`parseSearch`** reads a `$search` expression (the OData 4.01 ABNF `searchExpr` rule): words, double-quoted phrases, `NOT`, `AND` (or a space) and `OR`, grouped with parentheses and evaluated in the order grouping, `NOT`, `AND`, `OR`. `AND`, `OR` and `NOT` are operators only where the grammar puts them, and in capitals. A malformed expression throws an error `isSearchParseError` recognizes.
 
 ### The reference server's proxy forwards only to service roots it allows
 

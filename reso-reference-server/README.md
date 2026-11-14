@@ -172,7 +172,7 @@ The server implements OData 4.01 features required by the RESO Web API Add/Edit 
 | GET | `/api-docs` | Swagger UI documentation |
 | GET | `/health` | Health check |
 | POST | `/oauth/token` | Mock OAuth2 token endpoint |
-| GET | `/{Resource}` | Query collection (`$filter`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`) |
+| GET | `/{Resource}` | Query collection (`$filter`, `$search`, `$select`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`) |
 | POST | `/{Resource}` | Create a new record |
 | GET | `/{Resource}('{key}')` | Get a record by key (supports `$expand`) |
 | PATCH | `/{Resource}('{key}')` | Update a record |

@@ -11,7 +11,8 @@ import type { DataAccessLayer, ResourceContext } from '../db/data-access.js';
 import { getFieldsForResource, getKeyFieldForResource, isEnumType } from './loader.js';
 import type { ResoMetadata } from './types.js';
 
-const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
+/** The annotation that marks an `Edm.String` field as a lookup (string mode). */
+export const LOOKUP_NAME_ANNOTATION_TERM = 'RESO.OData.Metadata.LookupName';
 const ENUM_PREFIX = 'org.reso.metadata.enums.';
 
 /** Strips the enum namespace prefix from a type name. */
