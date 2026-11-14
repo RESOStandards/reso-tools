@@ -33,7 +33,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyMongoExpandSelect } from './expand-select.js';
+import { applyMongoExpandOptions } from './expand-options.js';
 import { filterToMongo } from './filter-to-mongo.js';
 import { coerceServedInteger } from './queries.js';
 
@@ -217,10 +217,10 @@ const batchExpandNavigation = async (
       result.push(expanded);
     }
 
-    return applyMongoExpandSelect(result, bindings);
+    return applyMongoExpandOptions(result, bindings);
   }
 
-  return applyMongoExpandSelect(stitched, bindings);
+  return applyMongoExpandOptions(stitched, bindings);
 };
 
 // ---------------------------------------------------------------------------

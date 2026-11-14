@@ -23,7 +23,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandSelect } from './expand-select.js';
+import { applyExpandOptions } from './expand-options.js';
 import { filterToSqlite } from './filter-to-sqlite.js';
 import { coerceServedInteger, deserializeRow } from './queries.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
@@ -415,10 +415,10 @@ const resolveChildExpand = (
   const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
 
   if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
-    return applyExpandSelect(resolveNestedExpand(database, stitched, nestedBindings, childCtx.resolveChildContext, depth), expandBindings);
+    return applyExpandOptions(resolveNestedExpand(database, stitched, nestedBindings, childCtx.resolveChildContext, depth), expandBindings);
   }
 
-  return applyExpandSelect(stitched, expandBindings);
+  return applyExpandOptions(stitched, expandBindings);
 };
 
 // ---------------------------------------------------------------------------
@@ -548,7 +548,7 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
         entities = resolveNestedExpand(db, entities, nestedBindings, ctx.resolveChildContext, 1);
       }
 
-      entities = applyExpandSelect(entities, expandBindings);
+      entities = applyExpandOptions(entities, expandBindings);
 
       return { value: entities, ...(count !== undefined ? { count } : {}) };
     }

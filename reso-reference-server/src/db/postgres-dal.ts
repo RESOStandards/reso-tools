@@ -19,7 +19,7 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandSelect } from './expand-select.js';
+import { applyExpandOptions } from './expand-options.js';
 import { filterToSql } from './filter-to-sql.js';
 import { deserializeRow } from './queries.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
@@ -428,13 +428,13 @@ const resolveChildExpand = async (
   const nestedBindings = expandBindings.filter(({ expandExpr }) => expandExpr.options.$expand && expandExpr.options.$expand.length > 0);
 
   if (nestedBindings.length > 0 && childCtx.resolveChildContext) {
-    return applyExpandSelect(
+    return applyExpandOptions(
       await resolveNestedExpand(pool, stitched, nestedBindings, childCtx.resolveChildContext, depth),
       expandBindings
     );
   }
 
-  return applyExpandSelect(stitched, expandBindings);
+  return applyExpandOptions(stitched, expandBindings);
 };
 
 // ---------------------------------------------------------------------------
@@ -582,7 +582,7 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
         entities = await resolveNestedExpand(pool, entities, nestedBindings, ctx.resolveChildContext, 1);
       }
 
-      entities = applyExpandSelect(entities, expandBindings);
+      entities = applyExpandOptions(entities, expandBindings);
 
       return { value: entities, ...(count !== undefined ? { count } : {}) };
     }

@@ -16,6 +16,15 @@
   write.
 - Without these settings nothing changes.
 
+### The reference server applies query options inside `$expand`
+
+- `$orderby`, `$skip`, `$top`, `$count` and `$select` inside an expansion now apply to the expanded collection, as OData 4.01 URL Conventions, Section 5.1.3 allows. Before, every option but `$select` and a nested `$expand` was ignored, so `$expand=Media($top=3)` returned every related record.
+- Ordering follows the field's type, puts nulls first in ascending order and last in descending order (OData 4.01 Protocol), and breaks ties by key, so a page is the same page every time.
+- `$count=true` adds `<NavigationProperty>@odata.count`, the size of the collection before paging.
+- The same options apply on a navigation path: `/Property('k')/Media?$orderby=Order&$top=10&$count=true`.
+- **Behavior change:** `$filter` and `$levels` inside an expansion, and `$filter` or `$search` on a navigation path, now answer **501 Not Implemented**, naming each one (OData 4.01 Protocol, Section 9.3.1). Before, they were ignored, and the unfiltered collection came back as if it had been filtered.
+- A malformed `$expand` on a single-record read now answers 400, not 500.
+
 ### The reference server's proxy forwards only to service roots it allows
 
 **Behavior change:** `/api/proxy` now forwards nothing until it is told where it may.

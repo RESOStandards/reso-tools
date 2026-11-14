@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NavigationPropertyBinding } from '../src/db/data-access.js';
-import { applyExpandSelect, applyMongoExpandSelect } from '../src/db/expand-select.js';
-import type { ExpandBinding } from '../src/db/expand-select.js';
+import { applyExpandOptions, applyMongoExpandOptions, isExpandOptionError, unsupportedExpandOptions } from '../src/db/expand-options.js';
+import type { ExpandBinding } from '../src/db/expand-options.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers — minimal binding/expression factories
@@ -31,18 +31,18 @@ const makeExpandBinding = (
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('applyExpandSelect', () => {
+describe('applyExpandOptions', () => {
   describe('no-op cases', () => {
     it('returns entities unchanged when no bindings have $select', () => {
       const entities = [{ ListingKey: 'L1', Rooms: [{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }] }];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey')];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       expect(result).toEqual(entities);
     });
 
     it('returns entities unchanged when expand bindings are empty', () => {
       const entities = [{ ListingKey: 'L1', ListPrice: 500000 }];
-      const result = applyExpandSelect(entities, []);
+      const result = applyExpandOptions(entities, []);
       expect(result).toEqual(entities);
     });
 
@@ -56,7 +56,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       expect(result[0].ListingKey).toBe('L1');
       expect(result[0].ListPrice).toBe(500000);
       expect(result[0].City).toBe('Austin');
@@ -75,7 +75,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([
         { RoomKey: 'R1', RoomType: 'Bedroom' },
@@ -91,7 +91,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType,Area' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }]);
     });
@@ -104,7 +104,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'Area' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', Area: 200 }]);
     });
@@ -119,7 +119,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].BuyerAgent).toEqual({ MemberKey: 'M1', MemberFirstName: 'Jane' });
     });
@@ -127,7 +127,7 @@ describe('applyExpandSelect', () => {
     it('leaves null to-one nav properties as null', () => {
       const entities = [{ ListingKey: 'L1', BuyerAgent: null }];
       const bindings = [makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName' }, { isCollection: false })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       expect(result[0].BuyerAgent).toBeNull();
     });
   });
@@ -154,7 +154,7 @@ describe('applyExpandSelect', () => {
           $expand: [{ property: 'Listing', options: { $select: 'ListPrice' } }]
         })
       ];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       // RoomType (selected), RoomKey (key), Listing (nested expand) — Area and ListingKey stripped
       const rooms = result[0].Rooms as Record<string, unknown>[];
@@ -185,7 +185,7 @@ describe('applyExpandSelect', () => {
           $expand: [{ property: 'Listing', options: {} }]
         })
       ];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       const rooms = result[0].Rooms as Record<string, unknown>[];
 
       // ListingKey FK column should be stripped (not in $select, not the key, not a nav prop name)
@@ -217,7 +217,7 @@ describe('applyExpandSelect', () => {
           ]
         })
       ];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       const rooms = result[0].Rooms as Record<string, unknown>[];
 
       expect(Object.keys(rooms[0]).sort()).toEqual(['Listing', 'Media', 'RoomKey', 'RoomType']);
@@ -237,7 +237,7 @@ describe('applyExpandSelect', () => {
         makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' }),
         makeExpandBinding('Media', 'MediaKey', { $select: 'MediaURL' })
       ];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom' }]);
       expect(result[0].Media).toEqual([{ MediaKey: 'M1', MediaURL: 'http://example.com/1.jpg' }]);
@@ -255,7 +255,7 @@ describe('applyExpandSelect', () => {
         makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' }),
         makeExpandBinding('Media', 'MediaKey') // no $select
       ];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom' }]);
       // Media untouched — all fields present
@@ -276,7 +276,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'Area' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', Area: 200 }]);
       expect(result[1].Rooms).toEqual([{ RoomKey: 'R2', Area: 150 }]);
@@ -287,7 +287,7 @@ describe('applyExpandSelect', () => {
     it('handles empty nav collections', () => {
       const entities = [{ ListingKey: 'L1', Rooms: [] }];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       expect(result[0].Rooms).toEqual([]);
     });
 
@@ -299,7 +299,7 @@ describe('applyExpandSelect', () => {
         }
       ];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: ' RoomType , Area ' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
 
       expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom', Area: 200 }]);
     });
@@ -307,14 +307,14 @@ describe('applyExpandSelect', () => {
     it('handles nav property missing from entity (undefined)', () => {
       const entities = [{ ListingKey: 'L1' }];
       const bindings = [makeExpandBinding('Rooms', 'RoomKey', { $select: 'RoomType' })];
-      const result = applyExpandSelect(entities, bindings);
+      const result = applyExpandOptions(entities, bindings);
       // Rooms is undefined — should not crash, entity returned as-is
       expect(result[0]).toEqual({ ListingKey: 'L1' });
     });
   });
 });
 
-describe('applyMongoExpandSelect', () => {
+describe('applyMongoExpandOptions', () => {
   it('works with MongoDB-style bindings using expr instead of expandExpr', () => {
     const entities = [
       {
@@ -328,8 +328,106 @@ describe('applyMongoExpandSelect', () => {
         expr: { property: 'Rooms', options: { $select: 'RoomType' } as Record<string, unknown> }
       }
     ];
-    const result = applyMongoExpandSelect(entities, bindings as Parameters<typeof applyMongoExpandSelect>[1]);
+    const result = applyMongoExpandOptions(entities, bindings as Parameters<typeof applyMongoExpandOptions>[1]);
 
     expect(result[0].Rooms).toEqual([{ RoomKey: 'R1', RoomType: 'Bedroom' }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// $orderby, $skip, $top and $count inside $expand (reso-tools #440)
+// ---------------------------------------------------------------------------
+
+describe('applyExpandOptions – ordering, paging and counting (#440)', () => {
+  const field = (fieldName: string, type: string) => ({ resourceName: 'Media', fieldName, type, nullable: true }) as never;
+  const mediaFields = [
+    field('MediaKey', 'Edm.String'),
+    field('Order', 'Edm.Int32'),
+    field('Caption', 'Edm.String'),
+    field('PreferredYN', 'Edm.Boolean')
+  ];
+  const media = (options: Record<string, unknown>) => makeExpandBinding('Media', 'MediaKey', options, { targetFields: mediaFields });
+  // Order arrives as a database might send it: a string for one row, a number for others, and a null.
+  const parent = () => [
+    {
+      ListingKey: 'L1',
+      Media: [
+        { MediaKey: 'M3', Order: '10', Caption: 'c', PreferredYN: 0 },
+        { MediaKey: 'M1', Order: 9, Caption: 'a', PreferredYN: 1 },
+        { MediaKey: 'M2', Order: null, Caption: 'b', PreferredYN: 0 },
+        { MediaKey: 'M4', Order: 9, Caption: 'd', PreferredYN: 0 }
+      ]
+    }
+  ];
+  const keys = (result: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<string> =>
+    (result[0].Media as ReadonlyArray<Record<string, unknown>>).map(m => m.MediaKey as string);
+
+  it('orders ascending with nulls first, numbers as numbers, and the key breaking ties', () => {
+    expect(keys(applyExpandOptions(parent(), [media({ $orderby: 'Order' })]))).toEqual(['M2', 'M1', 'M4', 'M3']);
+  });
+
+  it('orders descending with nulls last (OData 4.01 Protocol, $orderby), the direction in any case', () => {
+    expect(keys(applyExpandOptions(parent(), [media({ $orderby: 'Order DESC' })]))).toEqual(['M3', 'M1', 'M4', 'M2']);
+  });
+
+  it('orders by several terms', () => {
+    expect(keys(applyExpandOptions(parent(), [media({ $orderby: 'PreferredYN desc, Caption desc' })]))).toEqual(['M1', 'M4', 'M3', 'M2']);
+  });
+
+  it('pages with $skip and $top after ordering, by key when no $orderby is given', () => {
+    expect(keys(applyExpandOptions(parent(), [media({ $orderby: 'Order', $skip: 1, $top: 2 })]))).toEqual(['M1', 'M4']);
+    expect(keys(applyExpandOptions(parent(), [media({ $top: 2 })]))).toEqual(['M1', 'M2']);
+    expect(keys(applyExpandOptions(parent(), [media({ $skip: 3 })]))).toEqual(['M4']);
+    expect(keys(applyExpandOptions(parent(), [media({ $top: 0 })]))).toEqual([]);
+  });
+
+  it('counts the collection before paging, as <NavigationProperty>@odata.count placed just before it', () => {
+    const [result] = applyExpandOptions(parent(), [media({ $count: true, $top: 1 })]);
+    expect(result['Media@odata.count']).toBe(4);
+    expect((result.Media as unknown[]).length).toBe(1);
+    const order = Object.keys(result);
+    expect(order.indexOf('Media@odata.count')).toBe(order.indexOf('Media') - 1);
+  });
+
+  it('applies $select after ordering, so a collection can be ordered by a field it does not select', () => {
+    const [result] = applyExpandOptions(parent(), [media({ $orderby: 'Caption desc', $select: 'Order', $top: 2 })]);
+    expect(result.Media).toEqual([
+      { MediaKey: 'M4', Order: 9 },
+      { MediaKey: 'M3', Order: '10' }
+    ]);
+  });
+
+  it('applies only $select to a single-valued expansion', () => {
+    const agent = makeExpandBinding('BuyerAgent', 'MemberKey', { $select: 'MemberFirstName', $top: 1 }, { isCollection: false });
+    const [result] = applyExpandOptions(
+      [{ ListingKey: 'L1', BuyerAgent: { MemberKey: 'A', MemberFirstName: 'Pat', MemberLastName: 'Lee' } }],
+      [agent]
+    );
+    expect(result.BuyerAgent).toEqual({ MemberKey: 'A', MemberFirstName: 'Pat' });
+  });
+
+  it('refuses a malformed $orderby term or an unknown field as a client error', () => {
+    expect(() => applyExpandOptions(parent(), [media({ $orderby: 'Nope' })])).toThrow(
+      /Unknown field in \$orderby inside \$expand=Media: "Nope"/
+    );
+    expect(() => applyExpandOptions(parent(), [media({ $orderby: 'Order sideways' })])).toThrow(/Invalid \$orderby term/);
+    try {
+      applyExpandOptions(parent(), [media({ $orderby: 'Nope' })]);
+    } catch (err) {
+      expect(isExpandOptionError(err)).toBe(true);
+    }
+  });
+});
+
+describe('unsupportedExpandOptions (#440)', () => {
+  it('names each $filter and $levels inside $expand with its path, at any depth', () => {
+    expect(
+      unsupportedExpandOptions([
+        { property: 'Media', options: { $filter: "MediaType eq 'Jpeg'" } },
+        { property: 'ListOffice', options: { $expand: [{ property: 'Members', options: { $levels: 2 } }] } },
+        { property: 'Rooms', options: { $top: 2 } }
+      ])
+    ).toEqual(['$filter inside $expand=Media', '$levels inside $expand=ListOffice/Members']);
+    expect(unsupportedExpandOptions(undefined)).toEqual([]);
   });
 });
