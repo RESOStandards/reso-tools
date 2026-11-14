@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 import type { DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../src/db/data-access.js';
-import { navigationPropertyHandler } from '../src/odata/handlers.js';
+import { collectionHandler, navigationPropertyHandler, readHandler } from '../src/odata/handlers.js';
 import type { HandlerContext } from '../src/odata/handlers.js';
 
 // #285 — OData navigation-property-path GET `/{Resource}('key')/{NavProp}` (Web API Core 2.1.0 §2.5.10.2). The
@@ -147,5 +147,111 @@ describe('navigationPropertyHandler — to-one nav (#285)', () => {
       vi.fn()
     );
     expect(res._status).toBe(404);
+  });
+});
+
+// reso-tools #440 – the path's query options become the expansion's options; what is not implemented is a 501.
+describe('navigationPropertyHandler – query options on the path (#440)', () => {
+  it('passes $select, $orderby, $top, $skip and $count to the expansion, and returns the count', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', 'Media@odata.count': 7, Media: [{ MediaKey: 'M2' }] }));
+    const res = makeRes();
+    await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
+      makeReq("/Property('L1')/Media", { $select: 'MediaKey', $orderby: 'Order desc', $top: '1', $skip: '1', $count: 'true' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(vi.mocked(dal.readByKey).mock.calls[0][2]).toEqual({
+      $expand: [{ property: 'Media', options: { $select: 'MediaKey', $orderby: 'Order desc', $top: 1, $skip: 1, $count: true } }]
+    });
+    expect(res._status).toBe(200);
+    expect(res._body['@odata.count']).toBe(7);
+  });
+
+  it('passes $filter on the path to the expansion, where the backend applies it', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
+    const res = makeRes();
+    await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
+      makeReq("/Property('L1')/Media", { $filter: "MediaType eq 'Jpeg'" }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(vi.mocked(dal.readByKey).mock.calls[0][2]).toEqual({
+      $expand: [{ property: 'Media', options: { $filter: "MediaType eq 'Jpeg'" } }]
+    });
+    expect(res._status).toBe(200);
+  });
+
+  it('answers 501 for $search on the path, without reading anything', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
+    const res = makeRes();
+    await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
+      makeReq("/Property('L1')/Media", { $search: 'kitchen' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(501);
+    expect(JSON.stringify(res._body)).toMatch(/\$search on \/Property\('key'\)\/Media/);
+    expect(dal.readByKey).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for a $top that is not a non-negative integer', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1', Media: [] }));
+    const res = makeRes();
+    await navigationPropertyHandler(makeCtx(dal), mediaBinding)(
+      makeReq("/Property('L1')/Media", { $top: '-1' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(400);
+  });
+});
+
+describe('readHandler and collectionHandler – options inside $expand (#440)', () => {
+  it('answers 501 for $search inside $expand on a single read, naming it, without reading anything', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1' }));
+    const res = makeRes();
+    await readHandler(makeCtx(dal))(
+      makeReq("/Property('L1')", { $expand: 'Media($search=kitchen)' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(501);
+    expect(JSON.stringify(res._body)).toMatch(/\$search inside \$expand=Media/);
+    expect(dal.readByKey).not.toHaveBeenCalled();
+  });
+
+  it('answers 400, not 500, when a $filter inside $expand names a field the expanded resource lacks', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1' }));
+    vi.mocked(dal.readByKey).mockRejectedValueOnce(new Error('Unknown field in $filter: "Nope"'));
+    const res = makeRes();
+    await readHandler(makeCtx(dal))(
+      makeReq("/Property('L1')", { $expand: "Media($filter=Nope eq 'x')" }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(400);
+  });
+
+  it('answers 400, not 500, for a malformed $expand on a single read', async () => {
+    const dal = makeDal(() => ({ ListingKey: 'L1' }));
+    const res = makeRes();
+    await readHandler(makeCtx(dal))(
+      makeReq("/Property('L1')", { $expand: 'Media($top=abc)' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(400);
+  });
+
+  it('answers 501 for $levels inside $expand on a collection', async () => {
+    const dal = makeDal(() => undefined);
+    const res = makeRes();
+    await collectionHandler(makeCtx(dal))(
+      makeReq('/Property', { $expand: 'Media($levels=2)' }) as Request,
+      res as unknown as Response,
+      vi.fn()
+    );
+    expect(res._status).toBe(501);
+    expect(dal.queryCollection).not.toHaveBeenCalled();
   });
 });

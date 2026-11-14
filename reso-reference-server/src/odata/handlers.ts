@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso-standards/odata-expression-parser';
 import type { RequestHandler } from 'express';
 import type { CollectionQueryOptions, DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../db/data-access.js';
+import { expandOptionError, isExpandOptionError, unsupportedExpandOptions } from '../db/expand-options.js';
 import { buildAnnotations } from './annotations.js';
 import { resolveBaseUrl } from './base-url.js';
 import { buildODataError, buildValidationError } from './errors.js';
@@ -11,6 +12,31 @@ import { validateRequestBody } from './validation.js';
 /** Returns true if the error is a client-facing filter validation error (e.g. unknown field). */
 const isFilterError = (err: unknown): err is Error =>
   err instanceof Error && (err.message.includes('$filter') || err.message.includes('Unknown field'));
+
+/** A client error in `$expand` or in an option inside it: answered 400. */
+const isExpandClientError = (err: unknown): err is Error => err instanceof ExpandParseError || isExpandOptionError(err);
+
+/** Any client error in the query, a `$filter` inside an expansion included: answered 400, never 500. */
+const isQueryClientError = (err: unknown): err is Error =>
+  isExpandClientError(err) || err instanceof ParseError || err instanceof LexerError || isFilterError(err);
+
+/**
+ * Answer 501 for query functionality the server does not implement, naming each piece (OData 4.01 Protocol, Section
+ * 9.3.1), instead of answering as if it had been applied. Returns true when it answered.
+ */
+const answeredNotImplemented = (res: Parameters<RequestHandler>[1], items: ReadonlyArray<string>, operation: string): boolean => {
+  if (items.length === 0) return false;
+  setODataHeaders(res);
+  res.status(501).json(
+    buildODataError(
+      '50100',
+      `Not implemented: ${items.join('; ')}.`,
+      items.map(item => ({ target: '$expand', message: `${item} is not implemented` })),
+      operation
+    )
+  );
+  return true;
+};
 
 /** Extracts the OData key from a URL path like `/Property('12345')`. */
 const extractKey = (path: string): string | undefined => {
@@ -113,6 +139,7 @@ export const readHandler =
       const selectParam = req.query.$select as string | undefined;
       const expandParam = req.query.$expand as string | undefined;
       const expandTree = expandParam ? parseExpand(expandParam) : undefined;
+      if (answeredNotImplemented(res, unsupportedExpandOptions(expandTree), 'Read')) return;
 
       const row = await ctx.dal.readByKey(ctx.resourceCtx, key, {
         $select: selectParam,
@@ -132,6 +159,10 @@ export const readHandler =
       });
     } catch (err) {
       setODataHeaders(res);
+      if (isQueryClientError(err)) {
+        res.status(400).json(buildODataError('40000', err.message, [{ target: '$expand', message: err.message }], 'Read'));
+        return;
+      }
       res.status(500).json(buildODataError('50000', err instanceof Error ? err.message : 'Internal server error', [], 'Read'));
     }
   };
@@ -164,11 +195,42 @@ export const navigationPropertyHandler =
         return;
       }
 
-      // Resolve the parent + its navigation property via the same $expand machinery. A nested $select on the
-      // nav path is passed through to the expansion (so /Property('k')/Media?$select=MediaKey works).
-      const selectParam = req.query.$select as string | undefined;
+      // Resolve the parent + its navigation property via the same $expand machinery. The path's query options become
+      // the expansion's options, so /Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10 works. $search on
+      // the path is not implemented: 501, never an answer as if it had been applied.
+      if (
+        answeredNotImplemented(
+          res,
+          (['$search'] as const)
+            .filter(option => req.query[option] !== undefined)
+            .map(option => `${option} on /${ctx.resourceCtx.resource}('key')/${binding.name}`),
+          'Read'
+        )
+      )
+        return;
+      const query = req.query as Record<string, string | undefined>;
+      const integer = (name: '$top' | '$skip'): number | undefined => {
+        const value = query[name];
+        if (value === undefined) return undefined;
+        if (!/^\d+$/.test(value)) throw expandOptionError(`${name} must be a non-negative integer: "${value}"`);
+        return Number(value);
+      };
+      const top = integer('$top');
+      const skip = integer('$skip');
       const parent = await ctx.dal.readByKey(ctx.resourceCtx, key, {
-        $expand: [{ property: binding.name, options: selectParam ? { $select: selectParam } : {} }]
+        $expand: [
+          {
+            property: binding.name,
+            options: {
+              ...(query.$select !== undefined ? { $select: query.$select } : {}),
+              ...(query.$filter !== undefined ? { $filter: query.$filter } : {}),
+              ...(query.$orderby !== undefined ? { $orderby: query.$orderby } : {}),
+              ...(top !== undefined ? { $top: top } : {}),
+              ...(skip !== undefined ? { $skip: skip } : {}),
+              ...(query.$count === 'true' ? { $count: true } : {})
+            }
+          }
+        ]
       });
 
       if (!parent) {
@@ -183,9 +245,11 @@ export const navigationPropertyHandler =
       if (binding.isCollection) {
         // A collection nav always returns 200 with a (possibly empty) value array — a parent with no children.
         const value = Array.isArray(expanded) ? expanded : [];
+        const count = parent[`${binding.name}@odata.count`];
         setODataHeaders(res);
         res.status(200).json({
           '@odata.context': `${baseUrl}/$metadata#${binding.targetResource}`,
+          ...(typeof count === 'number' ? { '@odata.count': count } : {}),
           value
         });
         return;
@@ -204,6 +268,10 @@ export const navigationPropertyHandler =
       });
     } catch (err) {
       setODataHeaders(res);
+      if (isQueryClientError(err)) {
+        res.status(400).json(buildODataError('40000', err.message, [{ target: binding.name, message: err.message }], 'Read'));
+        return;
+      }
       res.status(500).json(buildODataError('50000', err instanceof Error ? err.message : 'Internal server error', [], 'Read'));
     }
   };
@@ -365,6 +433,7 @@ export const collectionHandler =
     try {
       const rawExpand = req.query.$expand as string | undefined;
       const expandTree = rawExpand ? parseExpand(rawExpand) : undefined;
+      if (answeredNotImplemented(res, unsupportedExpandOptions(expandTree), 'Query')) return;
 
       const prefer = req.headers.prefer as string | undefined;
       const maxPageSize = parseMaxPageSize(prefer);
@@ -425,9 +494,9 @@ export const collectionHandler =
       res.status(200).json(body);
     } catch (err) {
       setODataHeaders(res);
-      if (err instanceof ParseError || err instanceof LexerError || err instanceof ExpandParseError || isFilterError(err)) {
+      if (err instanceof ParseError || err instanceof LexerError || isExpandClientError(err) || isFilterError(err)) {
         const msg = err instanceof Error ? err.message : 'Invalid query expression';
-        const target = err instanceof ExpandParseError ? '$expand' : '$filter';
+        const target = isExpandClientError(err) ? '$expand' : '$filter';
         res.status(400).json(buildODataError('40000', msg, [{ target, message: msg }], 'Query'));
         return;
       }

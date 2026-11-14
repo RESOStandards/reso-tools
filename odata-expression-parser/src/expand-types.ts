@@ -22,6 +22,7 @@ export interface ExpandQueryOptions {
   readonly $count?: boolean;
   readonly $expand?: ReadonlyArray<ExpandExpression>;
   readonly $levels?: number | 'max';
+  readonly $search?: string;
 }
 
 // ---------------------------------------------------------------------------

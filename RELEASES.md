@@ -16,6 +16,20 @@
   write.
 - Without these settings nothing changes.
 
+### The reference server applies query options inside `$expand`
+
+- `$filter`, `$orderby`, `$skip`, `$top`, `$count` and `$select` inside an expansion now apply to the expanded collection, as OData 4.01 URL Conventions, Section 5.1.3 allows. Before, every option but `$select` and a nested `$expand` was ignored, so `$expand=Media($top=3)` returned every related record and `$expand=Media($filter=…)` returned them unfiltered.
+- `$filter` is applied where each backend fetches the children, through the same translator as a top-level `$filter`, so it means the same thing inside an expansion. It narrows a collection; on a single-valued expansion it is a 400.
+- Ordering follows the field's type, puts nulls first in ascending order and last in descending order (OData 4.01 Protocol), and breaks ties by key, so a page is the same page every time.
+- `$count=true` adds `<NavigationProperty>@odata.count`, the size of the filtered collection before paging.
+- The same options apply on a navigation path: `/Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10&$count=true`.
+- **Behavior change:** `$search` and `$levels` inside an expansion, and `$search` on a navigation path, answer **501 Not Implemented**, naming each one (OData 4.01 Protocol, Section 9.3.1). A malformed `$expand`, or a `$filter` inside one that names an unknown field, answers 400 on every route, not 500.
+
+### The expression parser reads an option's value strictly
+
+- **Behavior change:** inside `$expand`, `$top`, `$skip` and `$levels` take digits only, `$count` takes `true` or `false`, and an option with no value is refused. Before, `$top=` read as `$top=0`, `$top=1e2` as 100, and `$count=yes` as false.
+- `$search` inside an expansion is read, so a server can answer that it does not implement it instead of rejecting it as unknown.
+
 ### The reference server's proxy forwards only to service roots it allows
 
 **Behavior change:** `/api/proxy` now forwards nothing until it is told where it may.
