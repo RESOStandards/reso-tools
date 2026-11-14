@@ -17,10 +17,16 @@
  */
 
 import { createRequire } from 'node:module';
+// @ts-expect-error — legacy CJS
+import certUtilsCommon from '../legacy/common.js';
+// @ts-expect-error — legacy CJS, no type declarations
+import legacyVariations from '../legacy/lib/variations/index.js';
 import { CURRENT_DD_VERSION } from '../sdk/dd-versions.js';
 
+// The carried modules are static imports, so a bundler includes them: esbuild does not follow a require through a
+// createRequire binding. A package by name is left to Node's resolution, which works beside a bundle too.
 const require = createRequire(import.meta.url);
-const { buildMetadataMap } = require('../legacy/common.js');
+const { buildMetadataMap } = certUtilsCommon;
 const {
   MIN_MATCHING_LENGTH,
   CLOSE_MATCH_DISTANCE,
@@ -30,7 +36,7 @@ const {
   classifySuggestionStrategy,
   getDDWikiUrl,
   prepareResults
-} = require('../legacy/lib/variations/index.js');
+} = legacyVariations;
 import type { Bucketed, BucketedVariations, PreparedVariations, VariationEntry } from '@reso-standards/reso-common';
 const { distance } = require('fastest-levenshtein');
 

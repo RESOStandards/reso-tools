@@ -29,6 +29,9 @@ compare` and the functions behind it, `ask`, and wording changes to comments and
   is upgraded to https unless it is a loopback address) and is an origin with an optional path, never a query or a fragment. The
   token is minted by the existing client credentials exchange, which refuses a redirect. The credential never appears
   in an error message, including when the network fails.
+- **How the carried modules load:** `rcf-command`, `schema-command` and `variations-v2/compute` import the carried
+  CommonJS statically instead of through `createRequire` with a path, so a bundled copy includes it. Each import gives
+  the same module object the `require` did (checked against the built package), so nothing they do changes.
 - **Package contents:** `npm pack --dry-run` lists 598 files under the `files` allowlist, 28 more than 0.12.3: the
   compiled `analytics` modules, `assistant/ask`, and the two commands. No tests, fixtures, environment files or
   credentials.
@@ -44,8 +47,8 @@ compare` and the functions behind it, `ask`, and wording changes to comments and
 ### Method
 
 Review of every change since 0.12.3 against the built package: `npm audit`, `npm pack --dry-run` with a scan of the
-listed files, the full test suite (3,553 tests across 8 packages, 2,420 in this package), `analytics compare` run on
-two Data Dictionary runs of the reference server, and the redirect test watched failing before the fix.
+listed files, the full test suite (3,554 tests across 8 packages, 2,421 in this package), `analytics compare` run on
+two Data Dictionary runs of the reference server, the redirect test watched failing before the fix, and a bundled engine loaded and compared two runs.
 
 ---
 

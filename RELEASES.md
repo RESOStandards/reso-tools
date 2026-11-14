@@ -57,6 +57,13 @@
 - `reso-cert ask` never follows a redirect: the request carries the credential, so a 3xx is reported as a failure
   rather than followed to another host, as the token exchange and `restore` already do.
 
+### A bundled engine loads again
+
+- From 0.12.0, the engine failed to load when bundled into one file, as the RESO desktop app bundles it. Three modules
+  loaded the carried CommonJS through a path computed at run time, which a bundler cannot follow, so in a bundle the
+  path pointed beside the bundle file. They now load it by static import, which gives the same modules, and a test
+  fails if any module loads a file that way again. Run from `node_modules`, as the CLI runs, nothing changes.
+
 ---
 
 ## Certification 0.12.3 – 2026-11-12
