@@ -150,7 +150,15 @@ const answerFromResult = (result: unknown): AskAnswer => {
   return answer;
 };
 
-/** Asks the Assistant one question. Throws an `AskFailure` when no answer comes back. */
+const isRedirect = (status: number): boolean => status >= 300 && status < 400;
+
+/**
+ * Asks the Assistant one question. Throws an `AskFailure` when no answer comes back.
+ *
+ * A redirect is never followed. The request carries the credential, and a 307 or 308 keeps the method and the body, so
+ * following one would send the question, and possibly the credential, to whatever host the redirect names. A 3xx comes
+ * back as itself and is reported as a failure.
+ */
 export const askAssistant = async (options: AskOptions): Promise<AskAnswer> => {
   if (options.question.trim() === '') throw askFailure(0, 'A question is required.');
   if (options.authorization.trim() === '') throw askFailure(0, 'A credential for RESO services is required.');
@@ -163,10 +171,17 @@ export const askAssistant = async (options: AskOptions): Promise<AskAnswer> => {
       question: options.question,
       ...(options.history !== undefined && options.history.length > 0 ? { history: options.history } : {})
     }),
+    redirect: 'manual',
     ...(options.signal === undefined ? {} : { signal: options.signal })
   }).catch((error: unknown) => {
     throw askFailure(0, `Could not reach the Assistant at ${origin}: ${error instanceof Error ? error.message : 'the request failed'}.`);
   });
+  if (isRedirect(response.status)) {
+    throw askFailure(
+      response.status,
+      `The Assistant at ${origin} answered ${response.status}, a redirect, which is never followed. Check the address.`
+    );
+  }
 
   const streamed = response.ok && (response.headers.get('content-type') ?? '').includes(NDJSON) && response.body !== null;
   if (streamed && response.body !== null) {

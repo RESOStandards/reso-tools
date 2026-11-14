@@ -122,6 +122,17 @@ describe('refusals', () => {
     expect(askExitCode(error)).toBe(2);
   });
 
+  it('never follows a redirect, so the credential and the question go only to the address given', async () => {
+    const fetch = stub(new Response(null, { status: 307, headers: { Location: 'https://elsewhere.example.org/ask' } }));
+    const error = await runAsk({ question: 'q', env: ENV, fetch }).catch((e: unknown) => e);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual' });
+    expect(error).toMatchObject({ status: 307 });
+    expect(String((error as Error).message)).toMatch(/redirect, which is never followed/);
+    expect(String((error as Error).message)).not.toContain(CREDENTIAL);
+    expect(askExitCode(error)).toBe(2);
+  });
+
   it('never puts the credential in an error, even when the network fails', async () => {
     const fetch = vi.fn<typeof fetch>(async () => {
       throw new Error('connect ECONNREFUSED');
