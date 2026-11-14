@@ -33,9 +33,10 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyMongoExpandOptions, nestedCollectionFilter } from './expand-options.js';
+import { applyMongoExpandOptions, nestedCollectionFilter, nestedCollectionSearch } from './expand-options.js';
 import { filterToMongo } from './filter-to-mongo.js';
 import { coerceServedInteger } from './queries.js';
+import { allMongoConditions, searchToMongo } from './search.js';
 
 // ---------------------------------------------------------------------------
 // _id suppression helper
@@ -101,8 +102,9 @@ const batchExpandNavigation = async (
 
   for (const { binding, expr } of bindings) {
     const collection = db.collection(binding.targetResource);
-    // A $filter inside the expansion narrows the children, through the same translator as a top-level $filter.
+    // A $filter or $search inside the expansion narrows the children, through the same translators as at the top level.
     const nestedFilter = nestedCollectionFilter(binding, expr);
+    const nestedSearch = nestedCollectionSearch(binding, expr);
     const fk = binding.foreignKey;
 
     // Build projection for target fields — exclude _id and expansion fields (lazy via $expand)
@@ -147,7 +149,11 @@ const batchExpandNavigation = async (
       filter = { [targetCol]: { $in: parentKeys } };
     }
 
-    const query = nestedFilter ? { $and: [filter, filterToMongo(nestedFilter, binding.targetFields).query] } : filter;
+    const nested = allMongoConditions([
+      nestedFilter ? filterToMongo(nestedFilter, binding.targetFields).query : undefined,
+      nestedSearch !== undefined ? searchToMongo(nestedSearch, binding.targetFields, binding.targetKeyField) : undefined
+    ]);
+    const query = nested ? { $and: [filter, nested] } : filter;
     const docs = await collection.find(query, { projection: navProjection }).toArray();
 
     const grouped = new Map<string, Record<string, unknown>[]>();
@@ -243,8 +249,12 @@ export const createMongoDal = (db: Db): DataAccessLayer => {
   const queryCollection = async (ctx: ResourceContext, options?: CollectionQueryOptions): Promise<CollectionResult> => {
     const collection = db.collection(ctx.resource);
 
-    // Build MongoDB filter from $filter
-    const filter = options?.$filter ? filterToMongo(options.$filter, ctx.fields).query : {};
+    // Build MongoDB filter from $filter and $search: a document has to match both (OData 4.01 Protocol, $search).
+    const filter =
+      allMongoConditions([
+        options?.$filter ? filterToMongo(options.$filter, ctx.fields).query : undefined,
+        options?.$search !== undefined ? searchToMongo(options.$search, ctx.fields, ctx.keyField) : undefined
+      ]) ?? {};
 
     // Build projection from $select (always suppress _id and expansion fields — they are lazy, loaded via $expand)
     const expansionFieldNames = new Set(ctx.fields.filter(f => f.isExpansion).map(f => f.fieldName));

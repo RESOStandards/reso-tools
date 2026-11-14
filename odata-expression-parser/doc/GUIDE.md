@@ -1,6 +1,6 @@
 # OData Expression Parser – User Guide
 
-A task-oriented walkthrough of the RESO OData Expression Parser. This is the library that turns OData `$filter` and `$expand` strings into structured trees you can read, walk, transform, and write back out as canonical OData.
+A task-oriented walkthrough of the RESO OData Expression Parser. This is the library that turns OData `$filter`, `$expand` and `$search` strings into structured trees you can read, walk, transform, and write back out as canonical OData.
 
 If you have ever found yourself reaching for a regex to pull a field name out of a `$filter`, this is the library that ends that pattern.
 
@@ -261,7 +261,7 @@ Each element of the result is an `ExpandExpression` with a `property` (the name 
 
 ### Inline Query Options
 
-OData lets you embed `$select`, `$filter`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`, and `$levels` inside an `$expand` clause to scope the expansion. The parser pulls these out into a typed object:
+OData lets you embed `$select`, `$filter`, `$search`, `$orderby`, `$top`, `$skip`, `$count`, `$expand` and `$levels` inside an `$expand` clause to scope the expansion. The parser pulls these out into a typed object:
 
 ```typescript
 parseExpand('Media($select=MediaURL,MediaKey;$top=5;$orderby=Order asc)');
@@ -281,6 +281,7 @@ The supported options:
 |---|---|---|
 | `$select` | `string` | `Media($select=MediaURL,MediaKey)` |
 | `$filter` | `string` | `Media($filter=MediaType eq 'Photo')` |
+| `$search` | `string` | `Media($search=kitchen)` |
 | `$orderby` | `string` | `Media($orderby=Order asc)` |
 | `$top` | `number` | `Media($top=5)` |
 | `$skip` | `number` | `Media($skip=10)` |
@@ -340,6 +341,47 @@ parseExpand('Children($levels=max)');
 ```
 
 The parser preserves both the numeric and `"max"` forms. What you do with them downstream depends on your server.
+
+---
+
+## Parsing a Search
+
+`$search` is OData's free-text search: "which records mention this." `parseSearch` turns the expression into a small tree of terms, `NOT`, `AND` and `OR`:
+
+```typescript
+import { parseSearch } from '@reso-standards/odata-expression-parser';
+
+parseSearch('(mountain OR bike) AND NOT clothing');
+// → { type: "and",
+//     left: { type: "or",
+//             left: { type: "term", value: "mountain", phrase: false },
+//             right: { type: "term", value: "bike", phrase: false } },
+//     right: { type: "not", operand: { type: "term", value: "clothing", phrase: false } } }
+```
+
+A few rules come straight from the grammar:
+
+* **A space means `AND`.** `mountain bike` and `mountain AND bike` parse the same.
+* **`NOT` binds tighter than `AND`, and `AND` tighter than `OR`.** `a OR b c` is `a OR (b AND c)`.
+* **Phrases go in double quotes.** `"business case"` is one term, spaces included.
+* **Keywords are operators only where an operator fits, and only in capitals.** `rock and roll` is three words, and `OR` on its own is a word.
+* **A single-quoted expression is the incomplete form, for type-ahead.** `'busin'` is read as one phrase, with `''` inside standing for one quote.
+
+What a term *matches* is the service's choice: the grammar says how to read the expression, not what to search. The RESO Reference Server, for example, matches a term when one of a record's plain text fields contains it, ignoring case.
+
+A malformed expression throws an error that `isSearchParseError` recognizes, so a server can answer 400:
+
+```typescript
+import { isSearchParseError, parseSearch } from '@reso-standards/odata-expression-parser';
+
+try {
+  parseSearch('(roadmap');
+} catch (err) {
+  if (isSearchParseError(err)) {
+    // An unmatched parenthesis: the client's error.
+  }
+}
+```
 
 ---
 

@@ -23,9 +23,10 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandOptions, nestedCollectionFilter } from './expand-options.js';
+import { applyExpandOptions, nestedCollectionFilter, nestedCollectionSearch } from './expand-options.js';
 import { filterToSqlite } from './filter-to-sqlite.js';
 import { coerceServedInteger, deserializeRow } from './queries.js';
+import { allSqlConditions, searchToSqlite } from './search.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
 
 // ---------------------------------------------------------------------------
@@ -338,6 +339,7 @@ const resolveChildExpand = (
     const targetFields = binding.targetFields.filter(f => !f.isExpansion);
     const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
     const nestedFilter = nestedCollectionFilter(binding, expandExpr);
+    const nestedSearch = nestedCollectionSearch(binding, expandExpr);
 
     let sql: string;
     let values: unknown[];
@@ -357,10 +359,15 @@ const resolveChildExpand = (
       values = childKeys;
     }
 
-    if (nestedFilter) {
-      const filterSql = filterToSqlite(nestedFilter, binding.targetFields, `"${binding.targetResource}"`);
-      sql = `${sql} AND (${filterSql.where})`;
-      values = [...values, ...filterSql.values];
+    const nestedSql = allSqlConditions([
+      nestedFilter ? filterToSqlite(nestedFilter, binding.targetFields, `"${binding.targetResource}"`) : undefined,
+      nestedSearch !== undefined
+        ? searchToSqlite(nestedSearch, binding.targetFields, binding.targetKeyField, `"${binding.targetResource}"`)
+        : undefined
+    ]);
+    if (nestedSql) {
+      sql = `${sql} AND (${nestedSql.where})`;
+      values = [...values, ...nestedSql.values];
     }
 
     const rows = database.prepare(sql).all(...values) as Record<string, unknown>[];
@@ -459,14 +466,14 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
     }
     const parentSelectCols: ReadonlyArray<string> = buildSelectColumns(dataFields, ctx.keyField, expandSelect, parentAlias);
 
-    let whereClause = '';
-    const filterValues: unknown[] = [];
-    if (options?.$filter) {
-      const filterResult = filterToSqlite(options.$filter, ctx.fields, parentAlias);
-      whereClause = `WHERE ${filterResult.where}`;
-      filterValues.push(...filterResult.values);
-      values.push(...filterResult.values);
-    }
+    // $filter and $search together: a record has to match both (OData 4.01 Protocol, $search).
+    const conditions = allSqlConditions([
+      options?.$filter ? filterToSqlite(options.$filter, ctx.fields, parentAlias) : undefined,
+      options?.$search !== undefined ? searchToSqlite(options.$search, ctx.fields, ctx.keyField, parentAlias) : undefined
+    ]);
+    const whereClause = conditions ? `WHERE ${conditions.where}` : '';
+    const filterValues: ReadonlyArray<unknown> = conditions?.values ?? [];
+    values.push(...filterValues);
 
     // A fixed order for every page: the client's order, then the key, which is unique (stable-order.ts).
     const orderByClause = stableOrderBy(
@@ -512,10 +519,14 @@ export const createSqliteDal = (db: Database.Database): DataAccessLayer => {
       const outerJoinClauses: string[] = [];
       for (const { binding, alias: navAlias, expandExpr } of expandBindings) {
         outerNavCols.push(...buildNavSelectColumns(binding, navAlias));
-        // A $filter inside the expansion narrows the joined children, through the same translator as a top-level
-        // $filter. Its parameters follow the page's in the SQL text, so they follow them in values.
+        // A $filter or $search inside the expansion narrows the joined children, through the same translators as at
+        // the top level. Their parameters follow the page's in the SQL text, so they follow them in values.
         const nestedFilter = nestedCollectionFilter(binding, expandExpr);
-        const filterSql = nestedFilter ? filterToSqlite(nestedFilter, binding.targetFields, navAlias) : undefined;
+        const nestedSearch = nestedCollectionSearch(binding, expandExpr);
+        const filterSql = allSqlConditions([
+          nestedFilter ? filterToSqlite(nestedFilter, binding.targetFields, navAlias) : undefined,
+          nestedSearch !== undefined ? searchToSqlite(nestedSearch, binding.targetFields, binding.targetKeyField, navAlias) : undefined
+        ]);
         if (filterSql) values.push(...filterSql.values);
         outerJoinClauses.push(
           buildExpandJoin(ctx.resource, `${parentAlias}.${ctx.keyField}`, cteAlias, binding, navAlias) +

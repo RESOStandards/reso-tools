@@ -23,6 +23,8 @@ export { parseFilter, ParseError, LexerError } from './parser.js';
 export { astToFilterString } from './serializer.js';
 export { tokenize } from './lexer.js';
 export { parseExpand, ExpandParseError } from './expand-parser.js';
+export { parseSearch, searchParseError, isSearchParseError } from './search-parser.js';
+export type { SearchExpression } from './search-parser.js';
 export type {
   FilterExpression,
   ComparisonExpr,

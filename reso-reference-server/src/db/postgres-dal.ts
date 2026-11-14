@@ -19,9 +19,10 @@ import type {
   SingleResult
 } from './data-access.js';
 import { MAX_EXPAND_DEPTH } from './data-access.js';
-import { applyExpandOptions, nestedCollectionFilter } from './expand-options.js';
+import { applyExpandOptions, nestedCollectionFilter, nestedCollectionSearch } from './expand-options.js';
 import { filterToSql } from './filter-to-sql.js';
 import { deserializeRow } from './queries.js';
+import { allSqlConditions, searchToSql } from './search.js';
 import { stableOrderBy, withKeyLast } from './stable-order.js';
 
 // ---------------------------------------------------------------------------
@@ -348,6 +349,7 @@ const resolveChildExpand = async (
     const targetFields = binding.targetFields.filter(f => !f.isExpansion);
     const selectCols = targetFields.map(f => `"${f.fieldName}"`).join(', ');
     const nestedFilter = nestedCollectionFilter(binding, expandExpr);
+    const nestedSearch = nestedCollectionSearch(binding, expandExpr);
 
     let sql: string;
     let values: unknown[];
@@ -366,10 +368,24 @@ const resolveChildExpand = async (
       values = [childKeys];
     }
 
-    if (nestedFilter) {
-      const filterSql = filterToSql(nestedFilter, binding.targetFields, `"${binding.targetResource}"`, values.length + 1);
-      sql = `${sql} AND (${filterSql.where})`;
-      values = [...values, ...filterSql.values];
+    const nestedFilterSql = nestedFilter
+      ? filterToSql(nestedFilter, binding.targetFields, `"${binding.targetResource}"`, values.length + 1)
+      : undefined;
+    const nestedSql = allSqlConditions([
+      nestedFilterSql,
+      nestedSearch !== undefined
+        ? searchToSql(
+            nestedSearch,
+            binding.targetFields,
+            binding.targetKeyField,
+            `"${binding.targetResource}"`,
+            values.length + 1 + (nestedFilterSql?.values.length ?? 0)
+          )
+        : undefined
+    ]);
+    if (nestedSql) {
+      sql = `${sql} AND (${nestedSql.where})`;
+      values = [...values, ...nestedSql.values];
     }
 
     const result = await pool.query(sql, values);
@@ -479,16 +495,17 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
     }
     const parentSelectCols: ReadonlyArray<string> = buildSelectColumns(dataFields, ctx.keyField, expandSelect, parentAlias);
 
-    // Build WHERE clause from $filter
-    let whereClause = '';
-    const filterValues: unknown[] = [];
-    if (options?.$filter) {
-      const filterResult = filterToSql(options.$filter, ctx.fields, parentAlias, paramIndex);
-      whereClause = `WHERE ${filterResult.where}`;
-      filterValues.push(...filterResult.values);
-      values.push(...filterResult.values);
-      paramIndex += filterResult.values.length;
-    }
+    // Build WHERE clause from $filter and $search: a record has to match both (OData 4.01 Protocol, $search).
+    const filterResult = options?.$filter ? filterToSql(options.$filter, ctx.fields, parentAlias, paramIndex) : undefined;
+    const searchResult =
+      options?.$search !== undefined
+        ? searchToSql(options.$search, ctx.fields, ctx.keyField, parentAlias, paramIndex + (filterResult?.values.length ?? 0))
+        : undefined;
+    const conditions = allSqlConditions([filterResult, searchResult]);
+    const whereClause = conditions ? `WHERE ${conditions.where}` : '';
+    const filterValues: unknown[] = [...(conditions?.values ?? [])];
+    values.push(...filterValues);
+    paramIndex += filterValues.length;
 
     // A fixed order for every page: the client's order, then the key, which is unique (stable-order.ts).
     const orderByClause = stableOrderBy(
@@ -542,10 +559,23 @@ export const createPostgresDal = (pool: pg.Pool): DataAccessLayer => {
       const outerJoinClauses: string[] = [];
       for (const { binding, alias: navAlias, expandExpr } of expandBindings) {
         outerNavCols.push(...buildNavSelectColumns(binding, navAlias));
-        // A $filter inside the expansion narrows the joined children, through the same translator as a top-level
-        // $filter, numbered after the page's parameters.
+        // A $filter or $search inside the expansion narrows the joined children, through the same translators as at
+        // the top level, numbered after the page's parameters.
         const nestedFilter = nestedCollectionFilter(binding, expandExpr);
-        const filterSql = nestedFilter ? filterToSql(nestedFilter, binding.targetFields, navAlias, paramIndex) : undefined;
+        const nestedSearch = nestedCollectionSearch(binding, expandExpr);
+        const nestedFilterSql = nestedFilter ? filterToSql(nestedFilter, binding.targetFields, navAlias, paramIndex) : undefined;
+        const filterSql = allSqlConditions([
+          nestedFilterSql,
+          nestedSearch !== undefined
+            ? searchToSql(
+                nestedSearch,
+                binding.targetFields,
+                binding.targetKeyField,
+                navAlias,
+                paramIndex + (nestedFilterSql?.values.length ?? 0)
+              )
+            : undefined
+        ]);
         if (filterSql) {
           values.push(...filterSql.values);
           paramIndex += filterSql.values.length;

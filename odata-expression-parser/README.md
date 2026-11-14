@@ -1,6 +1,6 @@
 # @reso-standards/odata-expression-parser
 
-Stand-alone, zero-dependency library for parsing OData 4.01 `$filter` and `$expand` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](https://tools.reso.org/packages/reso-client/) for query validation and [`@reso-standards/reso-reference-server`](https://tools.reso.org/packages/reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
+Stand-alone, zero-dependency library for parsing OData 4.01 `$filter`, `$expand` and `$search` expressions into typed ASTs (abstract syntax trees). Used by both [`@reso-standards/reso-client`](https://tools.reso.org/packages/reso-client/) for query validation and [`@reso-standards/reso-reference-server`](https://tools.reso.org/packages/reso-reference-server/) for SQL WHERE clause generation and multi-level navigation property expansion.
 
 > **[User Guide](https://tools.reso.org/guides/odata-expression-parser/)** – a task-oriented walk-through with realistic examples.
 
@@ -204,6 +204,7 @@ parseExpand('Children($levels=max)');
 |--------|------|---------|
 | `$select` | string | `Media($select=MediaURL,MediaKey)` |
 | `$filter` | string | `Media($filter=MediaType eq 'Photo')` |
+| `$search` | string | `Media($search=kitchen)` |
 | `$orderby` | string | `Media($orderby=Order asc)` |
 | `$top` | number | `Media($top=5)` |
 | `$skip` | number | `Media($skip=10)` |
@@ -222,6 +223,7 @@ interface ExpandExpression {
 interface ExpandQueryOptions {
   readonly $select?: string;
   readonly $filter?: string;
+  readonly $search?: string;
   readonly $orderby?: string;
   readonly $top?: number;
   readonly $skip?: number;
@@ -231,12 +233,41 @@ interface ExpandQueryOptions {
 }
 ```
 
+## $search Parser
+
+Parse a `$search` expression with `parseSearch` (the OData 4.01 ABNF `searchExpr` rule). Words and double-quoted phrases combine with `NOT`, `AND` (or a space) and `OR`, grouped with parentheses and evaluated in the order grouping, `NOT`, `AND`, `OR`. What a term matches is up to the service.
+
+```typescript
+import { parseSearch } from '@reso-standards/odata-expression-parser';
+
+parseSearch('"business case" OR roadmap');
+// → { type: "or",
+//     left: { type: "term", value: "business case", phrase: true },
+//     right: { type: "term", value: "roadmap", phrase: false } }
+
+parseSearch('mountain bike NOT clothing');
+// → { type: "and",
+//     left: { type: "and", left: { type: "term", value: "mountain", ... }, right: { type: "term", value: "bike", ... } },
+//     right: { type: "not", operand: { type: "term", value: "clothing", ... } } }
+```
+
+- `AND`, `OR` and `NOT` are operators only where the grammar puts them, and only in capitals. Elsewhere they are words: `$search=rock and roll` searches for three words.
+- A single-quoted expression, `'busin'`, is the incomplete form sent for type-ahead. It is read as one phrase, with doubled single quotes inside read as one.
+- A malformed expression (an unmatched parenthesis, an unterminated or empty phrase, a semicolon) throws an error that `isSearchParseError` recognizes.
+
+```typescript
+type SearchExpression =
+  | { readonly type: 'term'; readonly value: string; readonly phrase: boolean }
+  | { readonly type: 'not'; readonly operand: SearchExpression }
+  | { readonly type: 'and' | 'or'; readonly left: SearchExpression; readonly right: SearchExpression };
+```
+
 ## Development
 
 ```bash
 npm install
 npm run build
-npm test        # 180 tests
+npm test        # 192 tests
 ```
 
 ## License

@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { ExpandParseError, LexerError, ParseError, parseExpand } from '@reso-standards/odata-expression-parser';
+import {
+  ExpandParseError,
+  LexerError,
+  ParseError,
+  isSearchParseError,
+  parseExpand,
+  searchParseError
+} from '@reso-standards/odata-expression-parser';
 import type { RequestHandler } from 'express';
 import type { CollectionQueryOptions, DataAccessLayer, NavigationPropertyBinding, ResourceContext } from '../db/data-access.js';
 import { expandOptionError, isExpandOptionError, unsupportedExpandOptions } from '../db/expand-options.js';
@@ -18,7 +25,17 @@ const isExpandClientError = (err: unknown): err is Error => err instanceof Expan
 
 /** Any client error in the query, a `$filter` inside an expansion included: answered 400, never 500. */
 const isQueryClientError = (err: unknown): err is Error =>
-  isExpandClientError(err) || err instanceof ParseError || err instanceof LexerError || isFilterError(err);
+  isExpandClientError(err) || err instanceof ParseError || err instanceof LexerError || isFilterError(err) || isSearchParseError(err);
+
+/**
+ * The `$search` option as given, or undefined. "The same system query option ... MUST NOT be specified more than once
+ * for any resource" (OData 4.01 URL Conventions, Section 5); given twice, Express reads it as an array.
+ */
+const searchOption = (value: unknown): string | undefined => {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw searchParseError('$search must not be specified more than once');
+  return value;
+};
 
 /**
  * Answer 501 for query functionality the server does not implement, naming each piece (OData 4.01 Protocol, Section
@@ -196,19 +213,9 @@ export const navigationPropertyHandler =
       }
 
       // Resolve the parent + its navigation property via the same $expand machinery. The path's query options become
-      // the expansion's options, so /Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10 works. $search on
-      // the path is not implemented: 501, never an answer as if it had been applied.
-      if (
-        answeredNotImplemented(
-          res,
-          (['$search'] as const)
-            .filter(option => req.query[option] !== undefined)
-            .map(option => `${option} on /${ctx.resourceCtx.resource}('key')/${binding.name}`),
-          'Read'
-        )
-      )
-        return;
+      // the expansion's options, so /Property('k')/Media?$filter=Order lt 5&$orderby=Order&$top=10 works.
       const query = req.query as Record<string, string | undefined>;
+      const search = searchOption(req.query.$search);
       const integer = (name: '$top' | '$skip'): number | undefined => {
         const value = query[name];
         if (value === undefined) return undefined;
@@ -224,6 +231,7 @@ export const navigationPropertyHandler =
             options: {
               ...(query.$select !== undefined ? { $select: query.$select } : {}),
               ...(query.$filter !== undefined ? { $filter: query.$filter } : {}),
+              ...(search !== undefined ? { $search: search } : {}),
               ...(query.$orderby !== undefined ? { $orderby: query.$orderby } : {}),
               ...(top !== undefined ? { $top: top } : {}),
               ...(skip !== undefined ? { $skip: skip } : {}),
@@ -393,6 +401,7 @@ export const deleteHandler =
 /** Raw query params used for nextLink serialization (avoids round-tripping parsed $expand). */
 interface RawQueryParams {
   readonly $filter?: string;
+  readonly $search?: string;
   readonly $select?: string;
   readonly $orderby?: string;
   readonly $top?: number;
@@ -416,6 +425,7 @@ const buildNextLink = (
   const nextSkip = skip + pageSize;
   const params: string[] = [];
   if (raw.$filter) params.push(`$filter=${encodeURIComponent(raw.$filter)}`);
+  if (raw.$search !== undefined) params.push(`$search=${encodeURIComponent(raw.$search)}`);
   if (raw.$select) params.push(`$select=${encodeURIComponent(raw.$select)}`);
   if (raw.$orderby) params.push(`$orderby=${encodeURIComponent(raw.$orderby)}`);
   // Preserve the client's original $top so subsequent pages know the total obligation
@@ -448,8 +458,10 @@ export const collectionHandler =
       // effective page size. $skip is an independent offset per OData spec.
       const fetchLimit = clientTop !== undefined ? Math.min(clientTop, effectivePageSize) : effectivePageSize;
 
+      const search = searchOption(req.query.$search);
       const options: CollectionQueryOptions = {
         ...(req.query.$filter && { $filter: req.query.$filter as string }),
+        ...(search !== undefined && { $search: search }),
         ...(req.query.$select && { $select: req.query.$select as string }),
         ...(req.query.$orderby && { $orderby: req.query.$orderby as string }),
         $top: fetchLimit,
@@ -478,6 +490,7 @@ export const collectionHandler =
       if (isFullPage && !clientSatisfied) {
         const rawParams: RawQueryParams = {
           $filter: options.$filter,
+          $search: options.$search,
           $select: options.$select,
           $orderby: options.$orderby,
           $top: clientTop,
@@ -494,9 +507,9 @@ export const collectionHandler =
       res.status(200).json(body);
     } catch (err) {
       setODataHeaders(res);
-      if (err instanceof ParseError || err instanceof LexerError || isExpandClientError(err) || isFilterError(err)) {
-        const msg = err instanceof Error ? err.message : 'Invalid query expression';
-        const target = isExpandClientError(err) ? '$expand' : '$filter';
+      if (isQueryClientError(err)) {
+        const msg = err.message;
+        const target = isExpandClientError(err) ? '$expand' : isSearchParseError(err) ? '$search' : '$filter';
         res.status(400).json(buildODataError('40000', msg, [{ target, message: msg }], 'Query'));
         return;
       }

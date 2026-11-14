@@ -23,6 +23,8 @@ import type { ResoField } from '../metadata/types.js';
 export interface CollectionQueryOptions {
   /** Parsed $filter string (raw OData expression, DAL implementation parses to AST). */
   readonly $filter?: string;
+  /** Raw $search expression (search.ts): a record has to match it and $filter both. */
+  readonly $search?: string;
   /** Comma-separated list of fields to return. */
   readonly $select?: string;
   /** Comma-separated ordering expressions, e.g. "ListPrice desc,City asc". */
