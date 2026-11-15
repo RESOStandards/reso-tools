@@ -16,6 +16,13 @@ import type { ParsedMetadata } from '../test-runner/types.js';
 import { declaredTypesOf } from '../web-api-core/declared-types.js';
 import { type FieldOverrideSummary, parseFieldOverrides, summarizeFieldOverrides } from '../web-api-core/field-override.js';
 import { NO_KEY_DECLARED, NO_RECORDS_SAMPLED, buildStandardMap, createLookupCache, resolveTestParams } from '../web-api-core/index.js';
+import {
+  type CoverageScan,
+  coverageScanAdvice,
+  coverageScanReason,
+  resourceTypesOf,
+  scanResourceCoverage
+} from '../web-api-core/resource-coverage.js';
 import { scenariosForVersion } from '../web-api-core/scenarios.js';
 import { resolveNoRecordsOutcome, resolveServingDecision } from '../web-api-core/serving.js';
 import { ddResourcesFor } from '../web-api-core/standard-map.js';
@@ -48,6 +55,8 @@ interface CoreContext extends BaseTestContext {
   readonly declaredResources?: ReadonlyArray<string>;
   /** The resources the run asked for that the metadata does not declare. Set by the fetch step. */
   readonly resourcesNotInMetadata?: ReadonlyArray<string>;
+  /** The quick coverage scan: types the resources tested cannot meet, and resources that have every type. Fetch step. */
+  readonly coverageScan?: CoverageScan;
   readonly resourceReports?: ReadonlyArray<ResourceTestReport>;
   /** Field-selection overrides for this run: requested, applied, what matched nothing, and what was not
    *  well-formed. Recorded because an override changes WHAT WAS TESTED, so a reviewer has to be able to see
@@ -128,11 +137,25 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
 
     // Eligibility is the server's, whatever the run names: what the metadata declares.
     const lacksCertifyingResource = !declaredResources.some(resource => CERTIFYING_RESOURCES.includes(resource));
+    // Full type coverage is read across every resource the server declares (resource-coverage.ts). A type declared only
+    // on resources this run will not test cannot be met, so say so now, with how to reach it, rather than after testing.
+    const coverageScan =
+      availableResources.length > 0
+        ? scanResourceCoverage(
+            declaredResources.flatMap(resource => {
+              const entityType = getEntityType(metadata, resource);
+              return entityType ? [resourceTypesOf(resource, entityType.properties, metadata.enumTypes)] : [];
+            }),
+            availableResources
+          )
+        : undefined;
+    const coverageUnreachable = coverageScan ? coverageScanReason(coverageScan) : undefined;
     const allErrors = [
       ...validationErrors,
       ...(noReference ? [NO_DD_REFERENCE] : []),
       ...(lacksCertifyingResource ? [NO_CERTIFYING_RESOURCE] : []),
-      ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : [])
+      ...(missingResources.length > 0 ? [`Resources not found in metadata: ${missingResources.join(', ')}`] : []),
+      ...(coverageUnreachable ? [coverageUnreachable] : [])
     ];
     const selection = ctx.resourcesNamed
       ? `${availableResources.length}/${requested.length} resources available`
@@ -147,12 +170,15 @@ const fetchAndParseMetadata = (config: CoreConfig): PipelineStep<CoreContext> =>
         resources: availableResources,
         metadata,
         declaredResources,
-        resourcesNotInMetadata: missingResources
+        resourcesNotInMetadata: missingResources,
+        ...(coverageScan ? { coverageScan } : {})
       },
       summary: `Parsed metadata: ${metadata.entityTypes.length} entity types, ${selection}. ${formatValidationSummary(validation)}`,
       counts: { entityTypes: metadata.entityTypes.length, resources: availableResources.length },
       ...(allErrors.length > 0 ? { errors: allErrors } : {}),
-      ...(!validation.xsdValid || !validation.semanticValid || noReference || lacksCertifyingResource ? { status: 'failed' as const } : {})
+      ...(!validation.xsdValid || !validation.semanticValid || noReference || lacksCertifyingResource || coverageUnreachable
+        ? { status: 'failed' as const }
+        : {})
     };
   }
 });
@@ -772,8 +798,8 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     // step's failure as a failed prior step, so the report and the step still agree.
     const recordsSampled = resourceReports.reduce((sum, r) => sum + (r.params.sampleRecordCount ?? 0), 0);
     const noRecords = recordsSampled === 0 && !deadlineReached;
-    // Full type coverage (type-coverage.ts): each type met on some resource tested. A type the server provides and the
-    // run met nowhere fails it; with --full-coverage, any missing type does. A run that tested no record measured
+    // Full type coverage (type-coverage.ts), always required: every type the server has met on some resource tested and
+    // its required tests passed. A type the server has nowhere is not required. A run that tested no record measured
     // nothing, and fails on that instead.
     // Types are seen across every element the server declares, standard and local (Josh, 2026-11-12: "but that's across
     // all standard and local elements"; "we must never have seen them"). A resource the run did not test (a local one
@@ -790,10 +816,17 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
           })
       : [];
     const coverage = typeCoverageOf(resourceReports, scenariosForVersion(ctx.version), unsampled);
-    const { coveredTypes, missingTypes, fullCoverage } = coverage;
-    const requireFullCoverage = config.fullCoverage ?? false;
-    const coverageFailed = coverageFails(coverage, requireFullCoverage, recordsSampled > 0);
-    const notDeclared = missingTypes.filter(type => !coverage.declaredNotMet.some(each => each.type === type));
+    const { coveredTypes, missingTypes, notDeclared } = coverage;
+    const coverageFailed = coverageFails(coverage, recordsSampled > 0);
+    const fullCoverage = recordsSampled > 0 && coverage.fullCoverage;
+    // What kept full coverage from being met: types declared and not met, and met types with a required test that never
+    // passed. Named apart, since a met type is not missing.
+    const notMet = coverage.declaredNotMet.map(each => each.type);
+    const notPassed = [...new Set(coverage.testsNotPassed.map(each => each.type))];
+    const notAchieved = [
+      ...(notMet.length > 0 ? [`Missing coverage: ${notMet.join(', ')}`] : []),
+      ...(notPassed.length > 0 ? [`required tests that did not pass on: ${notPassed.join(', ')}`] : [])
+    ].join('; ');
     const status = noRecords ? ('failed' as const) : coreVerdict({ totalFailed, coverageFailed, deadlineReached });
 
     // An override that matched no candidate on any resource changed nothing. Say so out loud rather than
@@ -850,13 +883,13 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
     const coverageMsg =
       recordsSampled === 0
         ? 'Type coverage was not measured: no records were tested'
-        : fullCoverage
-          ? 'Full type coverage achieved'
-          : `Missing coverage: ${missingTypes.join(', ')}${
-              notDeclared.length > 0 ? `; not declared by the server, so not required: ${notDeclared.join(', ')}` : ''
-            }`;
+        : `${fullCoverage ? 'Full type coverage achieved' : notAchieved}${
+            notDeclared.length > 0 ? `; not declared by the server, so not required: ${notDeclared.join(', ')}` : ''
+          }`;
     const whyNoRecords = noRecords ? noRecordsReason(ctx) : '';
-    const modeMsg = requireFullCoverage ? ' (--full-coverage enabled)' : '';
+    // The strict mode is gone (type-coverage.ts); a config or flag that still asks for it is told so, never failed.
+    const modeMsg = config.fullCoverage ? '. --full-coverage no longer changes anything: full type coverage is always required' : '';
+    const scanAdvice = ctx.coverageScan && ctx.coverageScan.unreachable.length > 0 ? coverageScanAdvice(ctx.coverageScan) : undefined;
     const incompleteMsg = deadlineReached ? 'INCOMPLETE – run deadline reached; remaining resources/scenarios not tested. ' : '';
 
     return {
@@ -866,6 +899,7 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
         coverageMatrix: {
           coveredTypes,
           missingTypes,
+          notDeclared,
           fullCoverage,
           declaredNotMet: coverage.declaredNotMet,
           testsNotPassed: coverage.testsNotPassed,
@@ -896,7 +930,12 @@ const sampleAndTest = (config: CoreConfig): PipelineStep<CoreContext> => ({
       },
       ...(coverageFailed || noRecords
         ? {
-            errors: [...(noRecords ? [whyNoRecords] : []), ...(coverageFailed ? coverageFailureReasons(coverage, requireFullCoverage) : [])]
+            errors: [
+              ...(noRecords ? [whyNoRecords] : []),
+              ...(coverageFailed
+                ? [...coverageFailureReasons(coverage), ...(scanAdvice ? [`To reach full type coverage: ${scanAdvice}`] : [])]
+                : [])
+            ]
           }
         : {})
     };

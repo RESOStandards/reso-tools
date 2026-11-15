@@ -2,7 +2,11 @@
 
 ---
 
-## Unreleased
+## Reference Server 0.9.0 and Certification 0.13.1 – 2026-11-15
+
+`reso-reference-server 0.9.0` · `odata-expression-parser 0.2.0` · `reso-certification 0.13.1`
+
+The reference server can serve your own resources read-only, applies the query options inside `$expand`, supports `$search`, pages in a fixed order and forwards only to the service roots it allows. The expression parser reads `$search` and reads an option's value strictly. The parser is a minor release because of that behavior change: packages on `^0.1.0`, such as reso-client and the certification engine through it, are unchanged. The certification engine's Web API Core full type coverage is one rule, checked across every resource the server declares: a patch, since it corrects how released certification decides coverage.
 
 ### The reference server can serve your own resources, read-only
 
@@ -15,6 +19,11 @@
   seeding at start, since a production database is set up separately and the server can then use a login that cannot
   write.
 - Without these settings nothing changes.
+
+### The reference server pages in a fixed order, and keeps local lookup values local
+
+- **Paging is stable.** The resource key is always the last sort column, and the only one when no `$orderby` is given, on SQLite, PostgreSQL and MongoDB. Before, rows tied on the sort column could come back in a different order on each page, so a record could appear on two pages or on none, and Web API Core's paging checks could fail on a correct server.
+- **A local lookup value stays local.** A value with no `StandardName` annotation now gets no `StandardLookupValue`, and its OData name comes from its `LegacyODataValue` annotation when the metadata gives one, as a provider's local Lookup Resource row reads. Before, the Lookup seeder gave every value a `StandardLookupValue`.
 
 ### The reference server applies query options inside `$expand`
 
@@ -53,6 +62,23 @@
   forwarded to.
 - **Keeping the earlier behavior:** `ALLOW_ANY_SERVICE_ROOT=true` forwards to any http(s) URL as before, with a warning
   at every start.
+
+### Web API Core: full type coverage is one rule, across every resource
+
+Full type coverage is always required: every data type the server has, on any resource, is met and its required tests
+pass. A type the server has nowhere is not required.
+
+- **One rule.** The strict mode is gone. `--full-coverage` and `coreOptions.fullCoverage` still run, change nothing and
+  say so. Before, they also failed a type the server does not have, which certification does not require.
+- **Naming fewer resources does not narrow it.** When the resources a run tests cannot meet a type the server declares
+  on another resource, the run says so right after reading the metadata, before it tests any records, and names a
+  resource that declares every type, or the resources to add. Before, it reached the same failure only after testing.
+  The check never fails a run the end of the run would pass.
+- **The words match the verdict.** "Full type coverage achieved" and `typeCoverage.achieved` in `report-detailed.json`
+  now follow the rule, so a passing server with no date field no longer reads as "Missing coverage: date".
+  `typeCoverage` adds `notDeclared`, the missing types the server has nowhere. The summary names a missing type apart
+  from a met type whose required tests did not pass.
+- **Verdicts.** Unchanged on every stored Core run checked, on the production Core results and on RESO's own Web API.
 
 ---
 

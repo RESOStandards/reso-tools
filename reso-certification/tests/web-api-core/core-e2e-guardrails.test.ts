@@ -70,6 +70,7 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
     const matrix = result.context.coverageMatrix as {
       coveredTypes: string[];
       missingTypes: string[];
+      notDeclared: string[];
       fullCoverage: boolean;
       declaredNotMet: ReadonlyArray<unknown>;
       testsNotPassed: ReadonlyArray<unknown>;
@@ -79,6 +80,7 @@ describe('Core end-to-end guardrails (mock server + report-file assertions)', ()
       achieved: matrix.fullCoverage,
       coveredTypes: matrix.coveredTypes,
       missingTypes: matrix.missingTypes,
+      notDeclared: matrix.notDeclared,
       declaredNotMet: matrix.declaredNotMet,
       testsNotPassed: matrix.testsNotPassed
     });

@@ -51,8 +51,7 @@ reso-cert core --url https://api.example.com --auth-token TOKEN
 # With options
 reso-cert core --url https://api.example.com --auth-token TOKEN \
   --resources Property,Member \
-  --spec-version 2.1.0 \
-  --full-coverage
+  --spec-version 2.1.0
 ```
 
 **Key differences:**

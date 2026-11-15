@@ -4,6 +4,71 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.13.1 Security Notes – 2026-11-15
+
+Pre-publish review of `@reso-standards/reso-certification` 0.13.1, covering every change since 0.13.0: Web API Core
+full type coverage as one rule, and the scan of the metadata that says when the resources a run tests cannot meet it.
+
+### Checked and Clean
+
+- **No new input or output.** The scan reads the metadata the run already parsed, and writes only to the step's errors
+  and the run's own report. It makes no request.
+- **Names in messages.** Resource and type names from the metadata appear in a step's error text as before, in the
+  same files; nothing is evaluated or used to build a path or a query.
+- **Credentials.** Untouched: no change reaches authentication, the requester or the report writer's token handling.
+- **Retired option.** `--full-coverage` and `coreOptions.fullCoverage` are accepted and ignored with a note, so an old
+  config cannot fail to parse or quietly change a verdict.
+
+## Reference Server 0.9.0 Security Notes – 2026-11-15
+
+Pre-publish review of `@reso-standards/reso-reference-server` 0.9.0 and `@reso-standards/odata-expression-parser`
+0.2.0, covering every change since 0.8.5 and 0.1.2: the outbound proxy's service roots, `$search`, the query options
+inside `$expand`, stable paging, local lookup values and the production instance settings.
+
+### Findings Addressed
+
+- **The outbound proxy forwarded anywhere.** Through 0.8.5, `/api/proxy` forwarded to any http(s) URL a caller named,
+  with the caller's credentials. 0.9.0 forwards only under service roots its host allows (`ALLOWED_SERVICE_ROOTS`, or
+  `allowServiceRoot` from an embedding host), and with none allowed it forwards nothing. `ALLOW_ANY_SERVICE_ROOT=true`
+  keeps the old behavior, with a warning at every start.
+
+### Checked and Clean
+
+- **What the proxy sends where:** the `Authorization` header goes only to the origin the caller asked for. Redirects
+  are taken one hop at a time with `redirect: 'manual'`, at most 5, and each target is checked against the allowed
+  roots as a new request; a hop to another origin carries no credentials. URLs with credentials in them, link-local
+  addresses and the cloud metadata service (by address and by its names) are refused, whatever is allowed.
+- **A limit, not a finding:** the link-local check reads the host name, not the address it resolves to. A name that
+  resolves to a link-local address is forwarded only if the host allowed it as a root.
+- **Request input reaching the database:** `$search` binds each term as a parameter (one per searched column on SQLite,
+  one per term on PostgreSQL) and escapes `%`, `_` and `\`; on MongoDB the term is regex-escaped. The searched
+  columns come from the metadata, never from the request. `$filter` inside `$expand` goes through the same
+  parameterized translator as a top-level `$filter`. `$orderby`, `$skip`, `$top`, `$count` and `$select` inside
+  `$expand` are applied in memory to children already fetched, and an `$orderby` name the target does not define is a
+  400.
+- **The parser's stricter reading** refuses values it used to coerce (`$top=` read as 0, `$top=1e2` as 100), so a
+  malformed option is a 400 rather than a silent default.
+- **The production instance:** with `PRODUCTION_INSTANCE=true` the server serves only the OData service and `/health`
+  (no Swagger UI, mock token endpoint, admin routes, outbound proxy, UI or static files) and changes nothing in the
+  database at start, so it can run with a login that cannot write. `READ_ONLY=true` removes every create, update and
+  delete route. Both are covered by their tests.
+- **Package contents:** `npm pack --dry-run` lists 35 files for the parser (31 in 0.1.2: the compiled `search-parser`
+  is new) and 204 for the server (192 in 0.8.5: the compiled `expand-options`, `search`, `stable-order` and
+  `proxy-policy`). Both carry only `dist`, the README, the license and, for the server, its allowlisted metadata,
+  seed data, UI configuration and public files. No tests, fixtures, environment files or credentials.
+- **Supply chain:** `npm audit --omit=dev` for the two packages reports nothing. The parser has no dependencies. The
+  server's only dependency change is its parser range, `^0.1.0` to `^0.2.0`. reso-client, the MCP server and the
+  certification engine through reso-client stay on the parser's `^0.1.0`, so none of them takes the stricter reading
+  with this release.
+
+### Method
+
+Review of every change since 0.8.5 and 0.1.2 against the built packages: `npm audit`, `npm pack --dry-run` with a
+scan of the listed files, the full test suite (3,614 tests across 8 packages, 377 in the reference server and 192 in
+the parser) and a reading of the proxy policy and of each path from a query option to the database.
+
+---
+
 ## Certification 0.13.0 Security Notes – 2026-11-13
 
 Pre-publish review of `@reso-standards/reso-certification` 0.13.0, covering every change since 0.12.3: `analytics

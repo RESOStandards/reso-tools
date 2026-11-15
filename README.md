@@ -1,6 +1,6 @@
 # RESO Tools
 
-![Tests](https://img.shields.io/badge/tests-3554%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-3623%20passed-brightgreen)
 ![Compliance](https://img.shields.io/badge/RESO%20compliance-4%2F4%20suites-blue)
 [![Release](https://img.shields.io/github/v/release/RESOStandards/reso-tools?label=release&color=blue)](https://github.com/RESOStandards/reso-tools/releases/latest)
 
@@ -19,10 +19,10 @@ Open-source toolkit for building and testing [RESO](https://www.reso.org/)-compl
 | [`reso-common/`](reso-common/) | Universal (browser + Node) RESO metadata model and projections – the shared `ResoMetadata` shape, pure helpers and EDMX generator (zero runtime dependencies) | 41 |
 | [`reso-metadata-utils/`](reso-metadata-utils/) | RESO OData metadata processing – CSDL parse + validate (CSDL/XSD), EDMX → metadata-report serialization, live metadata fetching (the deps-requiring side of the metadata split) | 160 |
 | [`reso-client/`](reso-client/) | OData 4.01 client SDK – URI builder, CRUD helpers, CSDL metadata parsing, OAuth2 Client Credentials | 211 |
-| [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter` and `$expand` expression parser | 180 |
+| [`odata-expression-parser/`](odata-expression-parser/) | Zero-dependency `$filter`, `$expand` and `$search` expression parser | 192 |
 | [`reso-validation/`](reso-validation/) | Isomorphic field and business-rule validation for RESO Data Dictionary records | 98 |
-| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 295 |
-| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit (RCP-010), EntityEvent (RCP-027), Web API Core and Data Dictionary, plus per-step utilities for metadata, schema, replication and variations ([docs](reso-certification/README.md)) | 2241 |
+| [`reso-reference-server/`](reso-reference-server/) | Metadata-driven OData reference server (PostgreSQL, MongoDB, SQLite) | 377 |
+| [`reso-certification/`](reso-certification/) | RESO Certification CLI + SDK – Add/Edit (RCP-010), EntityEvent (RCP-027), Web API Core and Data Dictionary, plus per-step utilities for metadata, schema, replication and variations ([docs](reso-certification/README.md)) | 2430 |
 | [`reso-mcp-server/`](reso-mcp-server/) | MCP server – exposes OData query, write, validation, certification tools for AI agents ([guide](reso-mcp-server/doc/GUIDE.md)) | 114 |
 
 ## Quick Start

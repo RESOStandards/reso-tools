@@ -130,10 +130,11 @@ See [Field Selection](https://tools.reso.org/packages/reso-certification/web-api
 when overriding it is worth doing.
 
 **Full type coverage.** The Core tests exercise six data types: integer, decimal, date, timestamp,
-single-valued lookup and multi-valued lookup. A run achieves full type coverage when each type is met
-on some field of some resource it tested. A single-valued lookup is met with one sampled value and a
-multi-valued lookup with two, as the specification gives them. Every run records whether it achieved
-full type coverage, in `report-detailed.json` as `typeCoverage`.
+single-valued lookup and multi-valued lookup. Full type coverage is always required: every type your
+server has is met on some field of some resource tested, and its tests pass. A single-valued lookup is
+met with one sampled value and a multi-valued lookup with two different values, as the specification
+gives them. Every run records whether it achieved full type coverage, in `report-detailed.json` as
+`typeCoverage`.
 
 All data types are required for Web API Core when your server has them, whether in standard or local
 fields. A type your metadata declares must be met and its tests must pass. The run looks for a field it
@@ -147,22 +148,25 @@ Property, Member, Office, Media or InternetTracking resource (Section 3.2 of the
 are tested is separate from that.
 
 Core 2.0.0 testing worked differently: the provider had to have every type on the same resource. Now
-the run looks across all the resources it tested.
+the types your server has are read across every resource it declares. Naming fewer resources does not
+narrow what is required: a type declared on a resource the run does not test still counts. When the
+resources a run tests cannot meet a type your server declares elsewhere, the run says so right after
+reading your metadata, before it tests any records, and names a resource that declares every type your
+server has, or the resources to add.
 
-To test as Core 2.0.0 did, name the resource and require full type coverage. With `--full-coverage`, any
-type that is not met fails the run, whether or not your server provides it. Add `--spec-version 2.0.0` to run the 2.0.0 tests themselves rather
-than 2.1.0's:
+To test as Core 2.0.0 did, name one resource that declares every type your server has. Add
+`--spec-version 2.0.0` to run the 2.0.0 tests themselves rather than 2.1.0's:
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN \
-  --resources Property --full-coverage
+  --resources Property
 ```
 
 For full equivalence, also name the fields your Core 2.0.0 report used, as field overrides:
 
 ```bash
 reso-cert core --url https://api.example.com --auth-token TOKEN \
-  --resources Property --full-coverage \
+  --resources Property \
   --field-overrides Property.BedroomsTotal,Property.ListPrice,Property.ListingContractDate,Property.ModificationTimestamp,Property.StandardStatus,Property.InteriorFeatures
 ```
 
@@ -170,7 +174,11 @@ The timestamp field is `ModificationTimestamp` unless you name another. Two thin
 The key field comes from your metadata. And the run samples the values it tests from your data, so
 they can differ from the values in your 2.0.0 report, and a field you name is used only when the
 sample holds at least two of its values, one of them in the past for a timestamp field. In a config file,
-the settings are `coreOptions.resources`, `coreOptions.fullCoverage` and `coreOptions.fieldOverrides`.
+the settings are `coreOptions.resources` and `coreOptions.fieldOverrides`.
+
+`--full-coverage` and `coreOptions.fullCoverage` no longer change anything. They were a stricter mode
+that also failed a type your server does not have, which certification does not require. Both are still
+accepted, so existing scripts and configs run.
 
 ### Data Dictionary 2.1
 

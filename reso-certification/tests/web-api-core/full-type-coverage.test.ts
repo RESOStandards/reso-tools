@@ -48,22 +48,28 @@ describe('whether a run met every type', () => {
     expect(verdict).toEqual({
       coveredTypes: ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup'],
       missingTypes: [],
+      notDeclared: [],
       fullCoverage: true,
       declaredNotMet: [],
       testsNotPassed: []
     });
   });
 
-  it('misses a type that no resource tested met', () => {
+  it('misses a type that no resource tested met, and does not require it when no resource declares it', () => {
     const verdict = typeCoverageOf([without(allMet('Property'), 'multiLookup'), without(allMet('Member'), 'multiLookup')]);
-    expect(verdict).toMatchObject({ missingTypes: ['multiLookup'], fullCoverage: false });
+    expect(verdict).toMatchObject({ missingTypes: ['multiLookup'], notDeclared: ['multiLookup'], fullCoverage: true });
   });
 
-  it('counts only the resources tested, so a run naming one resource needs every type there, as Core 2.0.0 did', () => {
-    expect(typeCoverageOf([without(allMet('Property'), 'multiLookup')])).toMatchObject({
-      missingTypes: ['multiLookup'],
-      fullCoverage: false
-    });
+  it('requires a type declared on a resource the run did not test, so naming one resource does not narrow it', () => {
+    // Josh, 2026-11-15: "we need to make sure someone can't just select a resource with one type, choose full
+    // coverage, and then pass". Core 2.0.0 parity is no longer a mode that excuses the rest.
+    const verdict = typeCoverageOf(
+      [without(allMet('Property'), 'multiLookup')],
+      [],
+      [{ resource: 'Member', declared: [{ type: 'multiLookup', fields: [{ field: 'MemberLanguages' }] }] }]
+    );
+    expect(verdict).toMatchObject({ missingTypes: ['multiLookup'], notDeclared: [], fullCoverage: false });
+    expect(coverageFails(verdict, true)).toBe(true);
   });
 });
 
@@ -193,8 +199,8 @@ describe('a type the server declares must be met and must pass', () => {
         ]
       }
     ]);
-    expect(coverageFails(verdict, false, true)).toBe(true);
-    expect(coverageFailureReasons(verdict, false)).toEqual([
+    expect(coverageFails(verdict, true)).toBe(true);
+    expect(coverageFailureReasons(verdict)).toEqual([
       'All data types are required for Web API Core when the server has them, whether in standard or local fields. The server declares date, and the run could not sample a field of it. Name the field to test with --field-overrides (coreOptions.fieldOverrides in a configuration file). Most populated: Member.MemberJoinDate (640 of 1,000 sampled records), Property.CloseDate (0 of 1,000 sampled records)'
     ]);
   });
@@ -206,15 +212,13 @@ describe('a type the server declares must be met and must pass', () => {
       [{ resource: 'Widget', declared: [{ type: 'date', fields: [{ field: 'WidgetDate' }] }] }]
     );
     expect(verdict.declaredNotMet).toEqual([{ type: 'date', fields: [{ field: 'Widget.WidgetDate' }] }]);
-    expect(coverageFailureReasons(verdict, false)[0]).toContain(
-      'Widget.WidgetDate (its resource was not tested: name it with --resources)'
-    );
+    expect(coverageFailureReasons(verdict)[0]).toContain('Widget.WidgetDate (its resource was not tested: name it with --resources)');
   });
 
   it('skips a type the server never declares, and lets the run certify', () => {
     const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
-    expect(verdict).toMatchObject({ missingTypes: ['date'], fullCoverage: false, declaredNotMet: [] });
-    expect(coverageFails(verdict, false, true)).toBe(false);
+    expect(verdict).toMatchObject({ missingTypes: ['date'], notDeclared: ['date'], fullCoverage: true, declaredNotMet: [] });
+    expect(coverageFails(verdict, true)).toBe(false);
   });
 
   const scenario = scenariosForVersion('2.1.0').find(each => each.tag === 'filter-date-ne');
@@ -235,7 +239,7 @@ describe('a type the server declares must be met and must pass', () => {
     expect(verdict.testsNotPassed).toEqual([
       { type: 'date', tag: 'filter-date-ne', name: 'Date: ne', reason: 'not conclusively testable' }
     ]);
-    expect(coverageFails(verdict, false, true)).toBe(true);
+    expect(coverageFails(verdict, true)).toBe(true);
   });
 
   it('excuses a test that does not apply to the server, one no resource ran, and one that passed on another resource', () => {
@@ -252,16 +256,17 @@ describe('a type the server declares must be met and must pass', () => {
     ).toEqual([]);
   });
 
-  it('fails any missing type in strict mode, the Core 2.0.0 parity mode, declared or not', () => {
+  it('has no strict mode: a type the server never declares fails nothing, and gives no reason', () => {
+    // The strict mode (--full-coverage) failed any missing type, declared or not; the rule does not require a type the
+    // server does not have (Josh, 2026-11-15), so there is one decision and nothing can switch it.
     const verdict = typeCoverageOf([report('Property', metExcept('date', []))]);
-    expect(coverageFails(verdict, true, true)).toBe(true);
-    expect(coverageFailureReasons(verdict, true)).toEqual(['Full coverage required but missing types: date']);
+    expect(coverageFails(verdict, true)).toBe(false);
+    expect(coverageFailureReasons(verdict)).toEqual([]);
   });
 
   it('is never a coverage failure when no record was tested: nothing was measured, and the run fails for that', () => {
     const verdict = typeCoverageOf([]);
-    expect(coverageFails(verdict, true, false)).toBe(false);
-    expect(coverageFails(verdict, false, false)).toBe(false);
+    expect(coverageFails(verdict, false)).toBe(false);
   });
 
   /**
@@ -284,14 +289,14 @@ describe('a type the server declares must be met and must pass', () => {
     const coverage = (missing: string): ReadonlyArray<TypeCoverage> =>
       declared.map(({ type, fields }) => ({ type, field: fields[0].field, hasData: type !== missing, declaredBy: fields }));
     for (const missing of ['integer', 'decimal', 'date', 'timestamp', 'singleLookup', 'multiLookup']) {
-      expect(coverageFails(typeCoverageOf([report('Property', coverage(missing))]), false, true), missing).toBe(true);
+      expect(coverageFails(typeCoverageOf([report('Property', coverage(missing))]), true), missing).toBe(true);
     }
-    expect(coverageFails(typeCoverageOf([report('Property', coverage('none'))]), false, true)).toBe(false);
+    expect(coverageFails(typeCoverageOf([report('Property', coverage('none'))]), true)).toBe(false);
   });
 
   it('suggests at most five fields in the reason, and points to the report for the rest', () => {
     const many = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((field, index) => ({ field, populated: 100 - index }));
-    const reason = coverageFailureReasons(typeCoverageOf([report('Property', metExcept('integer', many))]), false)[0];
+    const reason = coverageFailureReasons(typeCoverageOf([report('Property', metExcept('integer', many))]))[0];
     expect(reason).toContain('Property.E (96 of 1,000 sampled records), and 2 more in the report');
   });
 });

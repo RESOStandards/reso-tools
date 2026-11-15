@@ -10,9 +10,13 @@
  * couldn't pass on, they need to provide that info"). A type no resource tested declares is skipped: "if they don't
  * have the type at all it can be skipped", "but we must never have seen them".
  *
- * `--full-coverage` is the strict mode: every type met, none excused. Core 2.0.0 needed every type on one resource, so
- * testing as it did is naming that resource and requiring full coverage, and, for full equivalence, naming the fields
- * the 2.0.0 report used as overrides (Josh, 2026-11-03).
+ * Full type coverage is always required, and it is the only rule (Josh, 2026-11-15: "it should always be required in
+ * Cert"; "If they lack the required types (which are measured by looking across all resources, not all types on one
+ * resource) then a provider can pass without achieving total coverage across all types"). So full coverage is met when
+ * every type the server has is met and its required tests pass; a type it has nowhere is not part of it. The strict mode
+ * `--full-coverage` once failed any missing type, the server's or not, which the rule does not require; it is gone, and
+ * the flag is accepted and changes nothing. Naming one resource, as Core 2.0.0 testing did, does not narrow the types
+ * required: those on resources the run does not test still count (resource-coverage.ts says so before testing starts).
  */
 import type { CoreScenario } from './scenarios.js';
 import type { ScenarioResult, TypeCoverage } from './test-runner.js';
@@ -45,7 +49,11 @@ export interface TestNotPassed {
 
 export interface TypeCoverageVerdict {
   readonly coveredTypes: ReadonlyArray<string>;
+  /** Types no resource tested met, whether or not the server has them. */
   readonly missingTypes: ReadonlyArray<string>;
+  /** Missing types the server does not declare anywhere: not part of full coverage, so not required. */
+  readonly notDeclared: ReadonlyArray<string>;
+  /** Every type the server has was met and its required tests passed. Whether records were tested is the caller's. */
   readonly fullCoverage: boolean;
   /** Missing types the server declares: each fails the run until the server names a field for it. */
   readonly declaredNotMet: ReadonlyArray<DeclaredNotMet>;
@@ -145,22 +153,23 @@ export const typeCoverageOf = (
     const fields = suggestionsFor(type, reports, unsampled);
     return fields.length > 0 ? [{ type, fields }] : [];
   });
+  const testsNotPassed = testsNotPassedOf(scenarios, reports, coveredTypes);
   return {
     coveredTypes,
     missingTypes,
-    fullCoverage: missingTypes.length === 0,
+    notDeclared: missingTypes.filter(type => !declaredNotMet.some(each => each.type === type)),
+    fullCoverage: declaredNotMet.length === 0 && testsNotPassed.length === 0,
     declaredNotMet,
-    testsNotPassed: testsNotPassedOf(scenarios, reports, coveredTypes)
+    testsNotPassed
   };
 };
 
 /**
- * Whether coverage fails the run. Strict (`--full-coverage`): any missing type. Otherwise: any missing type the server
- * declares. Either way, a required test of a met type that did not pass. A run that tested no record measured nothing,
- * and fails for that reason instead, so it is never a coverage failure.
+ * Whether coverage fails the run: a type the server declares that was not met, or a required test of a met type that did
+ * not pass. A run that tested no record measured nothing, and fails for that reason instead, so it is never a coverage
+ * failure.
  */
-export const coverageFails = (verdict: TypeCoverageVerdict, requireFullCoverage: boolean, recordsTested: boolean): boolean =>
-  recordsTested && ((requireFullCoverage ? !verdict.fullCoverage : verdict.declaredNotMet.length > 0) || verdict.testsNotPassed.length > 0);
+export const coverageFails = (verdict: TypeCoverageVerdict, recordsTested: boolean): boolean => recordsTested && !verdict.fullCoverage;
 
 /** What a failure says first (Josh, 2026-11-12: "We can tell people that all types are required for Core if the server
  *  has them, whether in standard or local fields", "as the reason for the failure"). */
@@ -182,18 +191,14 @@ const suggestions = (fields: ReadonlyArray<SuggestedField>): string =>
 const NAME_A_FIELD = 'Name the field to test with --field-overrides (coreOptions.fieldOverrides in a configuration file)';
 
 /** Why coverage failed, one reason per type, in the words the provider sees. */
-export const coverageFailureReasons = (verdict: TypeCoverageVerdict, requireFullCoverage: boolean): ReadonlyArray<string> => {
-  const strict =
-    requireFullCoverage && !verdict.fullCoverage ? [`Full coverage required but missing types: ${verdict.missingTypes.join(', ')}`] : [];
-  const notMet = requireFullCoverage
-    ? []
-    : verdict.declaredNotMet.map(({ type, fields }) => {
-        const needs = type === 'multiLookup' ? ' A multi-valued lookup needs a field holding two different values.' : '';
-        return `${TYPES_REQUIRED}. The server declares ${type}, and the run could not sample a field of it.${needs} ${NAME_A_FIELD}. Most populated: ${suggestions(fields)}`;
-      });
+export const coverageFailureReasons = (verdict: TypeCoverageVerdict): ReadonlyArray<string> => {
+  const notMet = verdict.declaredNotMet.map(({ type, fields }) => {
+    const needs = type === 'multiLookup' ? ' A multi-valued lookup needs a field holding two different values.' : '';
+    return `${TYPES_REQUIRED}. The server declares ${type}, and the run could not sample a field of it.${needs} ${NAME_A_FIELD}. Most populated: ${suggestions(fields)}`;
+  });
   const notPassed = [...new Set(verdict.testsNotPassed.map(test => test.type))].map(type => {
     const tests = verdict.testsNotPassed.filter(test => test.type === type).map(test => `"${test.name}" (${test.reason})`);
     return `${TYPES_REQUIRED}. The server declares ${type}, and these tests did not pass on it: ${tests.join(', ')}. ${NAME_A_FIELD} that can carry them`;
   });
-  return [...strict, ...notMet, ...notPassed];
+  return [...notMet, ...notPassed];
 };
