@@ -364,6 +364,10 @@ export interface CoreConfig extends BaseComplianceConfig {
   readonly resources?: ReadonlyArray<string>;
   readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
   readonly metadataPath?: string;
+  /**
+   * No longer changes anything (0.13.1). It was a strict mode that also failed a type the server does not have; full
+   * type coverage is now always required, for every type the server has. Still accepted so existing configs run.
+   */
   readonly fullCoverage?: boolean;
   /**
    * Total wall-clock budget for the whole run, in ms. When it is spent the run stops

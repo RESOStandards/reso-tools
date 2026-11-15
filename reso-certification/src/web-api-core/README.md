@@ -14,8 +14,8 @@ reso-cert core --url https://api.example.com --auth-token TOKEN --resources Prop
 # Version 2.1.0
 reso-cert core --url https://api.example.com --auth-token TOKEN --spec-version 2.1.0
 
-# Require every data type, with none excused (Core 2.0.0 parity, with one resource named)
-reso-cert core --url https://api.example.com --auth-token TOKEN --full-coverage
+# Test one resource, as Core 2.0.0 did (every type the server has, on any resource, is still required)
+reso-cert core --url https://api.example.com --auth-token TOKEN --resources Property
 ```
 
 ## How It Works
@@ -159,9 +159,9 @@ Member:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  mul
 Office:     integer ✓  decimal -  date -  timestamp ✓  singleLookup ✓  multiLookup -
 ```
 
-Full type coverage means each of the six types is met on some field of some resource tested. No resource has to carry
-all six. A single-valued lookup is met with one sampled value and a multi-valued lookup with two, as the specification
-gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
+Full type coverage is always required: every type the server has is met on some field of some resource tested, and its
+required tests pass. No resource has to carry all six. A single-valued lookup is met with one sampled value and a
+multi-valued lookup with two different values, as the specification gives them. A multi-valued field without two values to test is not chosen for those tests, however standard: the run
 goes to the next field, and with none left the type is not met.
 
 All data types are required for Web API Core when the server has them, whether in standard or local fields. A type the
@@ -172,15 +172,25 @@ metadata never declares is not required. Which types the server declares is read
 of field selection, so a type selection missed still fails the run. A test that does not apply to the server (another
 lookup representation, `in` on OData 4.0) is not counted against it.
 
-Core 2.0.0 needed every type on one resource. To test as it did, run with `--resources Property --full-coverage`, and
-name the fields from your 2.0.0 report with `--field-overrides`. The key field and the values tested stay the run's own
-(see the [User Guide](https://tools.reso.org/guides/reso-certification/#web-api-core-210)).
+The types a server has are read across every resource it declares, whichever resources a run tests, so naming fewer
+resources does not narrow what is required. Right after reading the metadata, before any record is sampled, the run
+checks that the resources it will test can meet every type the server declares; when they cannot, the metadata step
+fails and names a resource that declares every type, or the resources to add (`resource-coverage.ts`). It never fails a
+run the coverage step would pass: it flags a type only when no resource tested has a field that selection could fill it
+with.
+
+Core 2.0.0 needed every type on one resource. To test as it did, name one resource that declares every type the server
+has, with `--resources`, and name the fields from your 2.0.0 report with `--field-overrides`. The key field and the
+values tested stay the run's own (see the [User Guide](https://tools.reso.org/guides/reso-certification/#web-api-core-210)).
 
 - **Every run** records whether full type coverage was achieved, in `report-detailed.json` as `typeCoverage`
-  (`achieved`, `coveredTypes`, `missingTypes`, `declaredNotMet` with the fields to name for each missing declared type,
-  and `testsNotPassed`), and in the run's summary.
-- **By default**, a missing declared type, or a required test of a met type that did not pass, fails the run.
-- **`--full-coverage`**: any missing type fails the run, declared or not.
+  (`achieved`, `coveredTypes`, `missingTypes`, `notDeclared` for the missing types the server has nowhere,
+  `declaredNotMet` with the fields to name for each missing declared type, and `testsNotPassed`), and in the run's
+  summary.
+- **Every run**: a missing declared type, or a required test of a met type that did not pass, fails the run. A type
+  the server has nowhere is not required.
+- **`--full-coverage`** no longer changes anything (0.13.1). It was a strict mode that also failed a type the server
+  does not have; it is still accepted.
 
 ## Report Format
 

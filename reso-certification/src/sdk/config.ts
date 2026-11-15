@@ -45,6 +45,7 @@ interface ConfigCoreOptions {
   readonly version?: string;
   readonly resources?: string | ReadonlyArray<string>;
   readonly enumMode?: 'auto' | 'isflags' | 'collections' | 'string';
+  /** No longer changes anything (0.13.1): full type coverage is always required. Accepted so existing configs run. */
   readonly fullCoverage?: boolean;
   readonly originatingSystemName?: string;
   readonly originatingSystemId?: string;

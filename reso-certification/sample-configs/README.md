@@ -116,12 +116,11 @@ Each endorsement reads an optional block. Everything in these blocks has a defau
 ```json
 "coreOptions": {
   "version": "2.1.0",
-  "resources": "Property,Member,Office",
-  "fullCoverage": true
+  "resources": "Property,Member,Office"
 }
 ```
 
-`resources` narrows the run and accepts either a comma-separated string or a list. `fullCoverage` fails the run when a data type is not met on some resource tested. Every run records whether it was.
+`resources` narrows the run and accepts either a comma-separated string or a list. Full type coverage is always required, across every resource the server declares, so narrowing the run does not narrow it. `fullCoverage` is still accepted and no longer changes anything.
 
 `fieldOverrides` names the field the run tests for a data type, as `Resource.Field`, in place of the one it would choose:
 

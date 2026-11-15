@@ -354,12 +354,14 @@ export const createDetailedReportGenerator = (
     // carries `requested`, `applied` and (when they differ) `unmatched` and `malformed` — the presence of
     // the key means an override was GIVEN, never that one took effect; `applied` is what answers that.
     const fieldOverrides = ctx.fieldOverrides as { readonly requested: ReadonlyArray<string> } | undefined;
-    // Web API Core: whether every data type was met, so a certification can say "Full Type Coverage Achieved" or "Could
-    // Not Be Achieved" (Josh, 2026-11-03). Here and not in `report.json`, whose key set the Cert API pins.
+    // Web API Core: whether full type coverage was achieved, which is always required: every type the server has met and
+    // its required tests passed; a type it has nowhere is not required (Josh, 2026-11-15). Here and not in `report.json`,
+    // whose key set the Cert API pins.
     const coverageMatrix = ctx.coverageMatrix as
       | {
           readonly coveredTypes: ReadonlyArray<string>;
           readonly missingTypes: ReadonlyArray<string>;
+          readonly notDeclared?: ReadonlyArray<string>;
           readonly fullCoverage: boolean;
           readonly declaredNotMet?: ReadonlyArray<{
             readonly type: string;
@@ -386,6 +388,8 @@ export const createDetailedReportGenerator = (
               achieved: coverageMatrix.fullCoverage,
               coveredTypes: coverageMatrix.coveredTypes,
               missingTypes: coverageMatrix.missingTypes,
+              // Missing types the server does not declare on any resource: not part of full coverage, so not required.
+              notDeclared: coverageMatrix.notDeclared ?? [],
               // Missing types the server declares, with the fields to name for them, most populated first: each one
               // fails the run until the server names a field. A type it never declares is not required.
               declaredNotMet: coverageMatrix.declaredNotMet ?? [],
