@@ -2,7 +2,11 @@
 
 ---
 
-## Unreleased
+## Reference Server 0.9.0 – 2026-11-15
+
+`reso-reference-server 0.9.0` · `odata-expression-parser 0.2.0`
+
+The reference server can serve your own resources read-only, applies the query options inside `$expand`, supports `$search`, pages in a fixed order and forwards only to the service roots it allows. The expression parser reads `$search` and reads an option's value strictly. The parser is a minor release because of that behavior change: packages on `^0.1.0`, such as reso-client and the certification engine through it, are unchanged.
 
 ### The reference server can serve your own resources, read-only
 
@@ -15,6 +19,11 @@
   seeding at start, since a production database is set up separately and the server can then use a login that cannot
   write.
 - Without these settings nothing changes.
+
+### The reference server pages in a fixed order, and keeps local lookup values local
+
+- **Paging is stable.** The resource key is always the last sort column, and the only one when no `$orderby` is given, on SQLite, PostgreSQL and MongoDB. Before, rows tied on the sort column could come back in a different order on each page, so a record could appear on two pages or on none, and Web API Core's paging checks could fail on a correct server.
+- **A local lookup value stays local.** A value with no `StandardName` annotation now gets no `StandardLookupValue`, and its OData name comes from its `LegacyODataValue` annotation when the metadata gives one, as a provider's local Lookup Resource row reads. Before, the Lookup seeder gave every value a `StandardLookupValue`.
 
 ### The reference server applies query options inside `$expand`
 

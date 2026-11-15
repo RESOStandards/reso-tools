@@ -1,6 +1,6 @@
 {
   "name": "@reso-standards/reso-reference-server",
-  "version": "0.8.5",
+  "version": "0.9.0",
   "description": "RESO Reference OData Server \u2013 metadata-driven CRUD server for RESO Data Dictionary resources",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
@@ -37,7 +37,7 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
-    "@reso-standards/odata-expression-parser": "^0.1.0",
+    "@reso-standards/odata-expression-parser": "^0.2.0",
     "@reso-standards/reso-common": "^0.4.0",
     "@reso-standards/reso-validation": "^0.1.0",
     "better-sqlite3": "^13.0.0",
