@@ -4,6 +4,21 @@ Findings are prepended newest-first. Close the linked GitHub issue when each fin
 
 ---
 
+## Certification 0.13.1 Security Notes – 2026-11-15
+
+Pre-publish review of `@reso-standards/reso-certification` 0.13.1, covering every change since 0.13.0: Web API Core
+full type coverage as one rule, and the scan of the metadata that says when the resources a run tests cannot meet it.
+
+### Checked and Clean
+
+- **No new input or output.** The scan reads the metadata the run already parsed, and writes only to the step's errors
+  and the run's own report. It makes no request.
+- **Names in messages.** Resource and type names from the metadata appear in a step's error text as before, in the
+  same files; nothing is evaluated or used to build a path or a query.
+- **Credentials.** Untouched: no change reaches authentication, the requester or the report writer's token handling.
+- **Retired option.** `--full-coverage` and `coreOptions.fullCoverage` are accepted and ignored with a note, so an old
+  config cannot fail to parse or quietly change a verdict.
+
 ## Reference Server 0.9.0 Security Notes – 2026-11-15
 
 Pre-publish review of `@reso-standards/reso-reference-server` 0.9.0 and `@reso-standards/odata-expression-parser`
