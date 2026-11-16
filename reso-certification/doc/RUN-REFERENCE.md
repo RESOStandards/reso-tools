@@ -278,7 +278,13 @@ Strict mode decides which of them appears and whether the availability reports a
   most to report is not the one that reports the least.
 
 The warnings file is written only when the run finished replication with warnings and **no** errors. A
-run that had both writes the errors file alone.
+run that had both writes the errors file alone, with its warnings in it.
+
+A run replicates with several strategies, and a strategy that runs to its end adds its findings to
+the run's. So both files describe the whole run: every distinct finding any strategy met. A count is
+the largest count one strategy gave that entry, never the sum across strategies, because the
+strategies read overlapping records. A count can therefore be low and is never high. A strict-mode
+failure is the exception: the errors file it writes holds the findings of the strategy that failed.
 
 ### `payloads/` and `entity-event-payloads/`
 

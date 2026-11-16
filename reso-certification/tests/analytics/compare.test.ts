@@ -132,6 +132,36 @@ describe('runMetricsFromReports', () => {
     expect(metricValue(m, 'fields.total')).toBe(3);
   });
 
+  // A run with errors and warnings writes the errors file alone, and its warnings are counted in that file. The
+  // warnings file exists only for a run with no errors.
+  it('reads a run’s warnings from the errors report when it has one, and from the warnings report when it does not', async () => {
+    const placement = { path: '/runs/x', endorsement: 'Data Dictionary', providerUoi: null, providerUsi: null, recipientUoi: null };
+    const withErrors = await runMetricsFromReports(
+      { metadataReport: metadataReport(BEFORE), schemaErrorsReport: { totalErrors: 4, totalWarnings: 7 } },
+      placement
+    );
+    expect(metricValue(withErrors, 'schema.errors')).toBe(4);
+    expect(metricValue(withErrors, 'schema.warnings')).toBe(7);
+
+    const warningsOnly = await runMetricsFromReports(
+      { metadataReport: metadataReport(BEFORE), schemaWarningsReport: { totalErrors: 0, totalWarnings: 3 } },
+      placement
+    );
+    expect(metricValue(warningsOnly, 'schema.errors')).toBe(0);
+    expect(metricValue(warningsOnly, 'schema.warnings')).toBe(3);
+
+    // A run written before the stale warnings file was removed can hold both. The errors report is the run's.
+    const both = await runMetricsFromReports(
+      {
+        metadataReport: metadataReport(BEFORE),
+        schemaErrorsReport: { totalErrors: 4, totalWarnings: 7 },
+        schemaWarningsReport: { totalErrors: 0, totalWarnings: 3 }
+      },
+      placement
+    );
+    expect(metricValue(both, 'schema.warnings')).toBe(7);
+  });
+
   it('refuses a metadata report with no version', async () => {
     await expect(
       runMetricsFromReports(

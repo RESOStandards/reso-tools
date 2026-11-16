@@ -257,7 +257,9 @@ export const runMetricsFromReports = async (
 
   const responsesStats = isRecord(reports.responsesReport?.stats) ? reports.responsesReport.stats : undefined;
   const schemaErrors = reports.schemaErrorsReport ? numberOr(reports.schemaErrorsReport.totalErrors, 0) : 0;
-  const schemaWarnings = reports.schemaWarningsReport ? numberOr(reports.schemaWarningsReport.totalWarnings, 0) : 0;
+  // A run with errors writes the errors file alone, and that file counts its warnings too. The warnings file is
+  // written only for a run with no errors, so it is read only when there is no errors report.
+  const schemaWarnings = numberOr((reports.schemaErrorsReport ?? reports.schemaWarningsReport)?.totalWarnings, 0);
 
   const overall: ReadonlyArray<Metric> = [
     metric(D.resources, ALL_RESOURCES, meta.totalResourcesCount),

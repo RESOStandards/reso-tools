@@ -19,6 +19,7 @@ const {
   scorePayload,
   writeAnalyticsReports,
   withoutValidatedRecords,
+  removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
   getSystemRuntimeInfo,
@@ -431,6 +432,9 @@ const replicate = async ({
         // the most to report was the one that reported the least.
         if (jsonSchemaValidation && schemaValidationResults?.stats?.totalErrors > 0) {
           await writeSchemaValidationErrorReport({ outputPath, errorMap: schemaValidationResults });
+          // The errors file now carries the run's warnings, so a warnings file an earlier strategy wrote, when the
+          // run had no errors yet, is out of date. A run with nothing to report still writes neither file.
+          await removeSchemaValidationWarningsReport({ outputPath });
         }
         // #298 — the transport-path context findings are warnings until DD 3.0 and were otherwise invisible.
         if (jsonSchemaValidation && schemaValidationResults?.stats?.totalWarnings > 0) {

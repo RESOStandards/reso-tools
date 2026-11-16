@@ -246,6 +246,36 @@ describe('a relaxed Data Dictionary run reports the schema findings of every str
     expect(report.totalWarnings).toBe(2);
   });
 
+  // The warnings file is for a run with warnings and no errors; a run with both writes the errors file alone, and
+  // its warnings are in that file. A strategy with warnings only, followed by one with errors, used to leave the
+  // first strategy's warnings file beside the errors file, describing one strategy of a run that had errors.
+  it('leaves no warnings file from an earlier strategy beside the errors file', async () => {
+    const base = await setUp({
+      records: [{ ListingKey: 'OLD1', ModificationTimestamp: OLD }, NEW1],
+      pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
+    });
+    const state = createReplicationStateServiceInstance();
+
+    // The old record alone: a warning, no error, so this strategy writes the warnings file.
+    await replicateWith(base, state, {
+      strategy: 'NextLink',
+      strictMode: false,
+      filter: `ModificationTimestamp lt ${thisYear - 2}-01-01T00:00:00.000Z`
+    });
+    expect(await readdir(base.outputPath)).toContain(WARNINGS_FILE);
+    // The recent record alone: an error, and a different warning.
+    await replicateWith(base, state, { strategy: 'NextLink', strictMode: false, filter: RECENT_ONLY });
+
+    const written = await readdir(base.outputPath);
+    expect(written).toContain(ERRORS_FILE);
+    expect(written).not.toContain(WARNINGS_FILE);
+    const report = await readReport(base.outputPath, ERRORS_FILE);
+    expect(report.totalErrors).toBe(1);
+    expect(messagesMatching(report.warnings, RESOURCE_MISMATCH)).toHaveLength(1);
+    expect(messagesMatching(report.warnings, MALFORMED)).toHaveLength(1);
+    expect(report.totalWarnings).toBe(2);
+  });
+
   it('starts from nothing in another run: the findings belong to the run’s own state', async () => {
     const first = await setUp({ records: [OLD1] });
     await replicateWith(first, createReplicationStateServiceInstance(), { strategy: 'TopAndSkip', strictMode: false });

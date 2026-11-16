@@ -1,7 +1,7 @@
 'use strict';
 
 const humanizeDuration = require('humanize-duration');
-const { writeFile } = require('fs/promises');
+const { writeFile, rm } = require('fs/promises');
 const { resolve, join } = require('path');
 const { createHash } = require('node:crypto');
 const queryString = require('node:querystring');
@@ -866,6 +866,18 @@ const writeSchemaValidationWarningsReport = async ({ outputPath, errorMap = {} }
 };
 
 /**
+ * Removes the warnings report, when there is one. The warnings file is for a run with warnings and no errors; a run
+ * with both writes the errors file alone, which carries its warnings. A strategy that had only warnings writes the
+ * warnings file, and when a later strategy of the same run brings an error, that file would otherwise stay beside the
+ * errors file, describing one strategy of a run that had errors.
+ *
+ * @param {{outputPath: string}} params
+ */
+const removeSchemaValidationWarningsReport = async ({ outputPath }) => {
+  await rm(resolveFilePathSync({ outputPath, filename: SCHEMA_VALIDATION_WARNINGS_FILENAME }), { force: true });
+};
+
+/**
  * Writes a data-availability-report.json file for the given version and availability data
  *
  * @param {Object} params
@@ -1572,6 +1584,7 @@ module.exports = {
   scorePayload,
   writeAnalyticsReports,
   withoutValidatedRecords,
+  removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
   SCHEMA_VALIDATION_WARNINGS_FILENAME,
