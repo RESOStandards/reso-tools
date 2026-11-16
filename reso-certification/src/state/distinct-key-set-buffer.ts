@@ -49,7 +49,7 @@ const DEFAULT_MAX_BYTES = 64 * 1024 * 1024;
  * of itself would give 64 bits of width over 32 bits of entropy, and the collision rate would stay
  * that of the narrower hash while the memory cost doubled.
  */
-const hashPair = (key: string): readonly [number, number] => {
+export const hashPair = (key: string): readonly [number, number] => {
   // Local mutable state inside a closure: scoped to this call and never leaked.
   let h1 = 0xdeadbeef;
   let h2 = 0x41c6ce57;
@@ -68,38 +68,67 @@ const hashPair = (key: string): readonly [number, number] => {
 };
 
 /**
- * Create a distinct-key set backed by one ArrayBuffer.
+ * Both words zero marks an empty slot, so a key whose hash is all zeros would be invisible.
+ * Forcing it to 1 makes that one key collide with the key that genuinely hashes to 1 - a single
+ * collision in 2^64, which undercounts, which is the safe direction. The alternative is a
+ * parallel occupancy bitmap for one key in eighteen quintillion.
+ */
+const nonZero = (lo: number, hi: number): readonly [number, number] => (lo === 0 && hi === 0 ? [1, 0] : [lo, hi]);
+
+/**
+ * The words a table stores for a key, from the key's one hash. Exported so a set made of several
+ * tables hashes a key once and asks each table about the same words.
+ */
+export const storedHashOf = (key: string, hashBits: 32 | 64): readonly [number, number] => {
+  const [h1, h2] = hashPair(key);
+  return hashBits === 64 ? nonZero(h1, h2) : nonZero(h1, 0);
+};
+
+/**
+ * One open-addressed table over stored hashes, with no opinion about saturation: it reports when it
+ * is full and refuses an insert then, and what "full" means to a caller is the caller's decision.
+ * {@link createBufferDistinctKeySet} is one table with the saturation contract on top; the segmented
+ * set is several.
+ */
+export interface HashTable {
+  /** Is this stored hash in the table? Pure. */
+  readonly contains: (lo: number, hi: number) => boolean;
+  /** Record a stored hash that is NOT already in the table. False when the table is full. */
+  readonly insert: (lo: number, hi: number) => boolean;
+  /** True once the table holds as many hashes as its load factor allows. */
+  readonly isFull: () => boolean;
+  readonly recorded: () => number;
+  /** How many hashes the table holds at its load factor. Fixed at construction. */
+  readonly capacity: number;
+  readonly bytesReserved: number;
+}
+
+/** How many bytes a table for this many keys reserves, before any ceiling is applied. */
+export const bytesForDistinctKeys = (targetDistinctKeys: number, hashBits: 32 | 64): number =>
+  Math.ceil(Math.max(1, targetDistinctKeys) / TARGET_LOAD_FACTOR) * (hashBits === 64 ? WORDS_PER_SLOT_64 : WORDS_PER_SLOT_32) * 4;
+
+/**
+ * Create one table backed by one ArrayBuffer.
  *
  * Sizing is EXACT: slots = ceil(targetDistinctKeys / 0.7), capped to fit `maxBytes`. Not rounded up
  * to a power of two.
  */
-export const createBufferDistinctKeySet = (options: DistinctKeySetOptions = {}): DistinctKeySet => {
-  const hashBits = options.hashBits ?? 64;
+export const createHashTable = (targetDistinctKeys: number, maxBytes: number, hashBits: 32 | 64): HashTable => {
   const wordsPerSlot = hashBits === 64 ? WORDS_PER_SLOT_64 : WORDS_PER_SLOT_32;
-  const target = Math.max(1, options.targetDistinctKeys ?? DEFAULT_TARGET_DISTINCT_KEYS);
-  const maxBytes = Math.max(wordsPerSlot * 4, options.maxBytes ?? DEFAULT_MAX_BYTES);
+  const target = Math.max(1, targetDistinctKeys);
+  const ceiling = Math.max(wordsPerSlot * 4, maxBytes);
 
   const wantedSlots = Math.ceil(target / TARGET_LOAD_FACTOR);
-  const affordableSlots = Math.max(1, Math.floor(maxBytes / (wordsPerSlot * 4)));
+  const affordableSlots = Math.max(1, Math.floor(ceiling / (wordsPerSlot * 4)));
   const slots = Math.min(wantedSlots, affordableSlots);
   // At least one, so a degenerately small budget saturates on the first add rather than reporting a
   // capacity of zero and a load factor that divides by it.
   const maxRecorded = Math.max(1, Math.floor(slots * TARGET_LOAD_FACTOR));
 
   const words = new Uint32Array(new ArrayBuffer(slots * wordsPerSlot * 4));
-  const bytesReserved = words.byteLength;
 
-  // Counters. Mutable, closure-scoped, never exposed except through `stats`.
+  // Mutable, closure-scoped, never exposed except through `recorded`.
   let recorded = 0;
-  let refused = 0;
-
-  /**
-   * Both words zero marks an empty slot, so a key whose hash is all zeros would be invisible.
-   * Forcing it to 1 makes that one key collide with the key that genuinely hashes to 1 - a single
-   * collision in 2^64, which undercounts, which is the safe direction. The alternative is a
-   * parallel occupancy bitmap for one key in eighteen quintillion.
-   */
-  const nonZero = (lo: number, hi: number): readonly [number, number] => (lo === 0 && hi === 0 ? [1, 0] : [lo, hi]);
 
   /** Slot index, or -1 when absent. Pure. */
   const find = (lo: number, hi: number): number => {
@@ -115,26 +144,10 @@ export const createBufferDistinctKeySet = (options: DistinctKeySetOptions = {}):
     return -1;
   };
 
-  const isSaturated = (): boolean => recorded >= maxRecorded;
+  const isFull = (): boolean => recorded >= maxRecorded;
 
-  const has = (key: string): boolean => {
-    // Saturated means "cannot rule anything out", and the contract says that reads as membership.
-    // Returning false here would let a caller count the same record on every sighting, which is the
-    // one direction that must never happen.
-    if (isSaturated()) return true;
-    const [h1, h2] = hashPair(key);
-    const [lo, hi] = wordsPerSlot === 2 ? nonZero(h1, h2) : nonZero(h1, 0);
-    return find(lo, hi) !== -1;
-  };
-
-  const add = (key: string): AddOutcome => {
-    const [h1, h2] = hashPair(key);
-    const [lo, hi] = wordsPerSlot === 2 ? nonZero(h1, h2) : nonZero(h1, 0);
-    if (find(lo, hi) !== -1) return 'present';
-    if (recorded >= maxRecorded) {
-      refused++;
-      return 'refused';
-    }
+  const insert = (lo: number, hi: number): boolean => {
+    if (isFull()) return false;
     let i = lo % slots;
     for (let probe = 0; probe < slots; probe++) {
       const at = i * wordsPerSlot;
@@ -142,21 +155,63 @@ export const createBufferDistinctKeySet = (options: DistinctKeySetOptions = {}):
         words[at] = lo;
         if (wordsPerSlot === 2) words[at + 1] = hi;
         recorded++;
-        return 'added';
+        return true;
       }
       i = i + 1 === slots ? 0 : i + 1;
     }
     // Unreachable while recorded < maxRecorded < slots, but a silent wrong answer here would be a
     // phantom duplicate, so it refuses rather than falling through.
+    return false;
+  };
+
+  return Object.freeze({
+    contains: (lo: number, hi: number): boolean => find(lo, hi) !== -1,
+    insert,
+    isFull,
+    recorded: (): number => recorded,
+    capacity: maxRecorded,
+    bytesReserved: words.byteLength
+  });
+};
+
+/**
+ * Create a distinct-key set backed by one ArrayBuffer: one table, which saturates when it is full.
+ */
+export const createBufferDistinctKeySet = (options: DistinctKeySetOptions = {}): DistinctKeySet => {
+  const hashBits = options.hashBits ?? 64;
+  const table = createHashTable(
+    options.targetDistinctKeys ?? DEFAULT_TARGET_DISTINCT_KEYS,
+    options.maxBytes ?? DEFAULT_MAX_BYTES,
+    hashBits
+  );
+
+  // Mutable, closure-scoped, never exposed except through `stats`.
+  let refused = 0;
+
+  const isSaturated = (): boolean => table.isFull();
+
+  const has = (key: string): boolean => {
+    // Saturated means "cannot rule anything out", and the contract says that reads as membership.
+    // Returning false here would let a caller count the same record on every sighting, which is the
+    // one direction that must never happen.
+    if (isSaturated()) return true;
+    const [lo, hi] = storedHashOf(key, hashBits);
+    return table.contains(lo, hi);
+  };
+
+  const add = (key: string): AddOutcome => {
+    const [lo, hi] = storedHashOf(key, hashBits);
+    if (table.contains(lo, hi)) return 'present';
+    if (table.insert(lo, hi)) return 'added';
     refused++;
     return 'refused';
   };
 
   const stats = (): DistinctKeySetStats => ({
-    recorded,
-    capacity: maxRecorded,
-    loadFactor: maxRecorded === 0 ? 1 : recorded / maxRecorded,
-    bytesReserved,
+    recorded: table.recorded(),
+    capacity: table.capacity,
+    loadFactor: table.capacity === 0 ? 1 : table.recorded() / table.capacity,
+    bytesReserved: table.bytesReserved,
     hashBits,
     saturated: isSaturated(),
     refused
