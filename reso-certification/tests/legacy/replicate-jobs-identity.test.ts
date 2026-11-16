@@ -221,6 +221,35 @@ const serverFailingTheSecondJob: ReadonlyArray<ReplicationMockOptions> = [
   media
 ];
 
+/**
+ * A server that answers one request of the second job with HTTP 500: the natural-order walk's first Office page, told
+ * apart by its records as the pages above are. The walk gets nothing, and the job goes on to its next walk.
+ */
+const serverFailingOneRequest: ReadonlyArray<ReplicationMockOptions> = serverWithErrors.map(resource =>
+  resource.resource === 'Office'
+    ? {
+        ...resource,
+        transformPage: page => {
+          if (keysOf(page, 'OfficeKey') === 'O1,O2') throw new Error('this page is not served');
+          return page;
+        }
+      }
+    : resource
+);
+
+/**
+ * A progress reader that throws once, on the first update from the second job's Member walk. Every walk sends an
+ * update with its first page, so this is a fault inside a page of the second job, after its Property walk.
+ */
+const progressReaderFailingInTheSecondJob = (): ((info: Json) => void) => {
+  const reader = { hasFailed: false };
+  return info => {
+    if (reader.hasFailed || info.strategy !== 'NextLink' || info.resourceName !== 'Member') return;
+    reader.hasFailed = true;
+    throw new Error('The progress reader failed');
+  };
+};
+
 // ── What a clock decides, removed before comparing ──
 
 const without = (value: unknown, drop: (key: string) => boolean): unknown =>
@@ -379,10 +408,17 @@ const threeCalls = (shared: Json): Promise<void> =>
 /** The same jobs, as one call to the driver. */
 const oneCall = (shared: Json): Promise<void> => replicateJobs({ ...shared, jobs: JOBS });
 
-const bothSides = async (server: ReadonlyArray<ReplicationMockOptions>, options: Json): Promise<{ calls: Side; driver: Side }> => ({
-  calls: await sideOf(server, options, threeCalls),
-  driver: await sideOf(server, options, oneCall)
-});
+/** Both sides of one run. `options` is asked for once a side, so a side can be given a reader of its own. */
+const bothSides = async (
+  server: ReadonlyArray<ReplicationMockOptions>,
+  options: Json | (() => Json)
+): Promise<{ calls: Side; driver: Side }> => {
+  const optionsOf = typeof options === 'function' ? options : () => options;
+  return {
+    calls: await sideOf(server, optionsOf(), threeCalls),
+    driver: await sideOf(server, optionsOf(), oneCall)
+  };
+};
 
 /**
  * Every part of the two sides, compared: what was asked for, what is on disk, and what the state holds. Each part is
@@ -401,6 +437,9 @@ const expectIdentical = ({ calls, driver }: { calls: Side; driver: Side }): void
     expect.soft(driver.state[part] === calls.state[part], `state ${part} is identical`).toBe(true);
   }
 };
+
+/** Whether a request is the lookback job's: it alone filters with `ge`. */
+const isLookback = (requestUri: string): boolean => /ModificationTimestamp(%20| )ge(%20| )/.test(requestUri);
 
 const reportOf = (side: Side, file: string): { totalErrors: number; totalWarnings: number; errors: Json; warnings: Json } =>
   JSON.parse(side.files[file]);
@@ -482,6 +521,58 @@ describe('one call with three jobs is identical to three calls', () => {
       ({ strategy, resourceName }) => `${strategy} ${resourceName}`
     );
     expect(stateStrategies.filter(entry => entry.startsWith('NextLink'))).toEqual(['NextLink Property']);
+  });
+});
+
+describe('one call with three jobs is identical to three calls when something goes wrong', () => {
+  it('a request the server fails in the second job: the walk ends, the job goes on, the same files', async () => {
+    const sides = await bothSides(serverFailingOneRequest, { strictMode: false });
+    expectIdentical(sides);
+    expect(sides.driver.failure).toBeUndefined();
+    // the request was made once by each side and never followed, and the second job has no Office response: the only
+    // NextLink responses for Office are the lookback job's, which carry its filter
+    const officeRequests = sides.driver.requests.filter(
+      request => request.startsWith('/Office') && request.endsWith('[odata.maxpagesize=2]')
+    );
+    expect(officeRequests.filter(request => !request.includes('$filter'))).toEqual(['/Office [odata.maxpagesize=2]']);
+    const officeWalks = responsesOf(sides.driver).filter(
+      response => response.resourceName === 'Office' && response.strategy === 'NextLink'
+    );
+    expect(officeWalks.length).toBeGreaterThan(0);
+    expect(officeWalks.every(response => isLookback(response.requestUri))).toBe(true);
+  });
+
+  it('a throw inside the second job: the same error, and the first job’s files on disk', async () => {
+    const sides = await bothSides(serverWithErrors, () => ({ strictMode: false, onProgress: progressReaderFailingInTheSecondJob() }));
+    expectIdentical(sides);
+    expect(sides.calls.failure?.message).toBe('The progress reader failed');
+    expect(sides.driver.failure?.message).toBe('The progress reader failed');
+    expect(sides.driver.failure?.job).toEqual({ index: 1, strategy: 'NextLink', label: 'NextLink' });
+    // what the first job wrote, and nothing of the second: its findings were never merged
+    expect(new Set(responsesOf(sides.calls).map(response => response.strategy))).toEqual(new Set(['TimestampDesc']));
+    expect(Object.keys(reportOf(sides.calls, ERRORS_FILE).warnings).filter(message => /member/i.test(message))).toHaveLength(0);
+  });
+
+  it('the same throw in a run that logs errors and goes on: the second job is left out, the third runs', async () => {
+    const sides = await bothSides(serverWithErrors, () => ({
+      strictMode: false,
+      throwOnError: false,
+      onProgress: progressReaderFailingInTheSecondJob()
+    }));
+    expectIdentical(sides);
+    expect(sides.calls.failure).toBeUndefined();
+    expect(sides.driver.failure).toBeUndefined();
+    const report = reportOf(sides.calls, ERRORS_FILE);
+    // the third job ended and wrote: its own warning is there, the second job's is not
+    expect(Object.keys(report.warnings).filter(message => /MUST be urn:reso:metadata/.test(message))).toHaveLength(1);
+    expect(Object.keys(report.warnings).filter(message => /member/i.test(message))).toHaveLength(0);
+    // the second job's Property walk had been recorded before it stopped, so the last reports list it
+    const walks = responsesOf(sides.calls).map(response =>
+      `${response.strategy} ${response.resourceName} ${isLookback(response.requestUri) ? 'lookback' : ''}`.trim()
+    );
+    expect(walks).toContain('NextLink Property');
+    expect(walks).not.toContain('NextLink Member');
+    expect(walks).toContain('NextLink Member lookback');
   });
 });
 
