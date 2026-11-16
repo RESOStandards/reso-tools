@@ -18,7 +18,7 @@ const {
   handleError,
   scorePayload,
   writeAnalyticsReports,
-  withoutValidatedRecords,
+  withoutBoundaryRepeats,
   removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
@@ -129,9 +129,6 @@ const replicate = async ({
 
     let schemaValidationResults = {};
 
-    // The records this call has validated, so one fetched again is not validated again. See withoutValidatedRecords.
-    const validatedRecordHashes = new Set();
-
 
     if (jsonSchemaValidation) {
 
@@ -204,6 +201,9 @@ const replicate = async ({
         // Shape: { [resourceName]: { count, mean, M2, anomalyCount,
         //                            maxAnomalyMs, maxAnomalyDelta } }
         const byResourceStats = {};
+        // What the page before left for this walk's schema validation to skip. One walk, one page: see
+        // withoutBoundaryRepeats before changing its scope.
+        let boundaryWindow = {};
         let lastProgressTime = 0;
         const PROGRESS_INTERVAL_MS = 500;
         const replicationStartTime = Date.now();
@@ -328,10 +328,13 @@ const replicate = async ({
               await handleError({ error, rateLimitedWaitTimeMinutes });
             } else if (hasResults) {
               if (jsonSchemaValidation) {
+                const unrepeated = withoutBoundaryRepeats({ jsonData: responseJson, strategy, window: boundaryWindow });
+                boundaryWindow = unrepeated.window;
+
                 schemaValidationResults =
                   validate({
                     version,
-                    jsonPayload: withoutValidatedRecords({ jsonData: responseJson, resourceName, validatedRecordHashes }),
+                    jsonPayload: unrepeated.jsonData,
                     errorMap: schemaValidationResults,
                     jsonSchema: generatedSchema,
                     resourceName,

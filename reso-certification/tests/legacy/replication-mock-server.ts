@@ -30,6 +30,11 @@ export interface ReplicationMockOptions {
    * same record is served with different content under different request shapes, as a real server does.
    */
   readonly expansions?: Readonly<Record<string, unknown>>;
+  /**
+   * Changes a page before it is served. `request` counts the page requests so far, from 1 (the count probe is not
+   * one), so a test can serve a record differently the second time it is fetched, or repeat a page.
+   */
+  readonly transformPage?: (page: ReadonlyArray<Record<string, unknown>>, request: number) => ReadonlyArray<Record<string, unknown>>;
 }
 
 export interface ReplicationMockServer {
@@ -90,6 +95,7 @@ const parseMaxPageSize = (prefer: string | undefined): number | undefined => {
 export const startReplicationMockServer = async (opts: ReplicationMockOptions): Promise<ReplicationMockServer> => {
   const tsField = opts.timestampField ?? 'ModificationTimestamp';
   const app = express();
+  const pageRequests = { count: 0 };
 
   app.get(`/${opts.resource}`, (req, res) => {
     const q = req.query as Record<string, string | undefined>;
@@ -105,11 +111,13 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
     const pageSize = toInt(q.$top) ?? parseMaxPageSize(req.get('prefer')) ?? 100;
     const skip = toInt(q.$skip) ?? 0;
     const expanded = (q.$expand ?? '').split(',').filter(name => name in (opts.expansions ?? {}));
-    const page = ordered
+    const sliced = ordered
       .slice(skip, skip + pageSize)
       .map(record =>
         expanded.length ? { ...record, ...Object.fromEntries(expanded.map(name => [name, opts.expansions?.[name]])) } : record
       );
+    pageRequests.count++;
+    const page = opts.transformPage ? opts.transformPage(sliced, pageRequests.count) : sliced;
 
     const pageContext = typeof opts.pageContext === 'function' ? opts.pageContext(page) : opts.pageContext;
     const body: Record<string, unknown> = {

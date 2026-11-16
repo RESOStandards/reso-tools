@@ -65,52 +65,6 @@ const hashJsonData = (jsonData, useFullHashes = false) => {
 };
 
 /**
- * The most record identities one call keeps. A V8 Set holds 2^24 entries and throws past that.
- */
-const MAX_VALIDATED_RECORD_HASHES = 2 ** 24 - 1;
-
-/**
- * A page without the records this `replicate()` call has already validated, for schema validation only.
- *
- * The timestamp walks fetch each page's boundary record again by design, and a server may repeat a record on its
- * own. Validating a repeat finds nothing new and counts every violation on it again, and a count must never be
- * high. So a record is validated once per call.
- *
- * A record is the same record when its resource and its whole content as served are the same, expanded data
- * included. That is NOT the hash the availability guard in `scorePayload` uses: that one takes the expanded data
- * out of the parent before hashing, so a record fetched alone and then with an expansion has the same parent hash,
- * and skipping on it would leave the expanded data unvalidated. Here those two are different records and both are
- * validated. A record whose content changed between two fetches is a different record too.
- *
- * The identity is the full SHA-256, not the shortened hash availability uses. A collision there undercounts, which
- * is allowed. A collision here would skip a record that was never validated, and a missed error is a false pass.
- * For the same reason every doubt resolves to validating: a record that cannot be hashed is kept, and once the set
- * is full, records it has not seen are kept without being remembered.
- *
- * Everything else on the page is returned as it came, so a finding about the page itself (its `@reso.context`) is
- * made once per page fetched, as before. `validatedRecordHashes` is added to.
- *
- * @param {Object} obj
- * @param {Object} obj.jsonData the page as the server returned it
- * @param {String} obj.resourceName the resource the page was requested from
- * @param {Set<String>} obj.validatedRecordHashes the identities this call has validated so far
- * @returns the page with only the records not validated yet, or `jsonData` itself when it is not a page of records
- */
-const withoutValidatedRecords = ({ jsonData, resourceName, validatedRecordHashes }) => {
-  if (!Array.isArray(jsonData?.value)) return jsonData;
-
-  const value = jsonData.value.filter(record => {
-    const hash = hashJsonData({ resourceName, record }, true);
-    if (!hash) return true;
-    if (validatedRecordHashes.has(hash)) return false;
-    if (validatedRecordHashes.size < MAX_VALIDATED_RECORD_HASHES) validatedRecordHashes.add(hash);
-    return true;
-  });
-
-  return { ...jsonData, value };
-};
-
-/**
  * Extracts values from JSON Data
  *
  * @param {Object} jsonData
@@ -211,6 +165,85 @@ const computeLastIsoTimestamp = ({ jsonData = {}, lastIsoTimestamp, strategy, ti
       return minIsoTimestamp;
     }
   }
+};
+
+/**
+ * A timestamp walk's page without the records the walk itself fetched twice, for schema validation only.
+ *
+ * WHY. The timestamp walks page inclusively: `buildRequestUrlString` asks for `le <last timestamp>` going down and
+ * `ge <last timestamp>` going up, so each page after the first opens with the records the page before returned at
+ * that boundary timestamp. That repeat is deliberate, and availability drops it by the record hash in `scorePayload`.
+ * Schema validation runs on the raw page, so a violation on a boundary record was counted twice, and a count must
+ * never be high.
+ *
+ * WHAT. A window of one page, in a timestamp walk only. From each page it remembers the records at the timestamp the
+ * next request will start from. On the next page of the same walk, a record is left out of validation only when its
+ * JSON, exactly as served and with its expanded data, is identical to a remembered one. Each remembered record
+ * excuses one repeat.
+ *
+ * WHAT IT MUST NOT BECOME. Do not widen this, and do not copy it elsewhere:
+ *   - Not a set for the call or the run. The reported error totals are occurrence counts by design: a record is
+ *     validated once per request shape (alone, and once with each expansion), and report tools divide by one plus
+ *     the number of expansions. Skipping a record seen under another shape changes a published number. Counting
+ *     distinct violations is #17, with DD 2.2.
+ *   - Not keyed on the availability hash. `normalizeRecords` takes the expanded data out of the parent before
+ *     hashing, so a record has the same hash alone and in each of its expansion walks.
+ *   - Not a set that can fill. A set that answers "seen" once full would skip validation, and a skipped error is a
+ *     false pass.
+ *   - Not for TopAndSkip or NextLink. Those walks never ask for a record twice, so a repeat there is the server's
+ *     pager at fault, which the run is meant to show, not hide.
+ *   - Never the availability guard. Its hash set is global to the run on purpose; windowing it to a page lets a
+ *     server re-serve dense records on later pages and be counted again.
+ * A record whose content changed between the two fetches is not identical, so it is validated again: its values may
+ * differ, and when in doubt the record is validated.
+ *
+ * WHEN IT GOES. Paging by (timestamp, key) (#254, phase 4 of the 0.14.0 plan) removes the repeat at its source, and
+ * this function goes with it.
+ *
+ * The next request's starting timestamp is worked out with `computeLastIsoTimestamp`, the function the iterator uses,
+ * so the window follows the walk: when the walk steps one millisecond past a timestamp (a page that did not move the
+ * boundary), no record of this page is at the new starting point and nothing is remembered.
+ *
+ * @param {Object} obj
+ * @param {Object} obj.jsonData the page as the server returned it
+ * @param {String} obj.strategy the walk's replication strategy
+ * @param {{lastIsoTimestamp?: String, records?: Map<String, Number>}} [obj.window] what the page before left
+ * @param {String} [obj.timestampFieldName] the field the walk pages on
+ * @returns {{jsonData: Object, window: Object}} the page to validate (the same object when nothing was left out),
+ *   and the window for the next page of this walk
+ */
+const withoutBoundaryRepeats = ({ jsonData, strategy, window = {}, timestampFieldName = DEFAULT_TIMESTAMP_FIELD }) => {
+  const isTimestampWalk = strategy === REPLICATION_STRATEGIES.TIMESTAMP_ASC || strategy === REPLICATION_STRATEGIES.TIMESTAMP_DESC;
+  if (!isTimestampWalk || !Array.isArray(jsonData?.value)) return { jsonData, window: {} };
+
+  const excusable = new Map(window.records ?? []);
+  const value = jsonData.value.filter(record => {
+    const served = JSON.stringify(record);
+    const remaining = excusable.get(served) ?? 0;
+    if (remaining === 0) return true;
+    excusable.set(served, remaining - 1);
+    return false;
+  });
+
+  const isoOf = timestamp => {
+    const date = new Date(timestamp);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
+
+  // A page whose timestamps cannot be read gives the next page nothing to skip.
+  let nextWindow = {};
+  try {
+    const lastIsoTimestamp = computeLastIsoTimestamp({ jsonData, lastIsoTimestamp: window.lastIsoTimestamp ?? null, strategy, timestampFieldName });
+    const records = jsonData.value
+      .filter(record => !!lastIsoTimestamp && isoOf(record?.[timestampFieldName]) === lastIsoTimestamp)
+      .map(record => JSON.stringify(record))
+      .reduce((counts, served) => counts.set(served, (counts.get(served) ?? 0) + 1), new Map());
+    nextWindow = { lastIsoTimestamp, records };
+  } catch {
+    nextWindow = {};
+  }
+
+  return { jsonData: value.length === jsonData.value.length ? jsonData : { ...jsonData, value }, window: nextWindow };
 };
 
 /**
@@ -1583,7 +1616,7 @@ module.exports = {
   getRandomInt,
   scorePayload,
   writeAnalyticsReports,
-  withoutValidatedRecords,
+  withoutBoundaryRepeats,
   removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
