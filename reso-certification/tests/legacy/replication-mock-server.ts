@@ -10,6 +10,9 @@
  * Every non-empty page advertises an `@odata.nextLink` when more rows remain — the NextLink strategy follows
  * it; the others ignore it and page by $skip / boundary filter. A page past the end returns `{ value: [] }` and
  * no nextLink, which is how each strategy terminates. Uses an OS-assigned port (listen(0)) for tests.
+ *
+ * `startReplicationMockServer` serves one resource. `startMultiResourceReplicationMockServer` serves several from one
+ * root, each with its own records, expansions and page context, as a Data Dictionary run meets them.
  */
 
 import type { Server } from 'node:http';
@@ -35,6 +38,12 @@ export interface ReplicationMockOptions {
    * one), so a test can serve a record differently the second time it is fetched, or repeat a page.
    */
   readonly transformPage?: (page: ReadonlyArray<Record<string, unknown>>, request: number) => ReadonlyArray<Record<string, unknown>>;
+  /**
+   * When true, `@odata.nextLink` keeps the request's `$filter`, `$orderby`, `$expand` and `$top`, as a real server's
+   * does, so a NextLink walk stays filtered, ordered and expanded past its first page. Off by default: the link then
+   * carries `$skip` alone.
+   */
+  readonly nextLinkKeepsQuery?: boolean;
 }
 
 export interface ReplicationMockServer {
@@ -92,9 +101,15 @@ const parseMaxPageSize = (prefer: string | undefined): number | undefined => {
   return match ? Number.parseInt(match[1], 10) : undefined;
 };
 
-export const startReplicationMockServer = async (opts: ReplicationMockOptions): Promise<ReplicationMockServer> => {
+/** The query options a next link carries over from its request, in the order the request gave them. */
+const NEXT_LINK_KEPT_OPTIONS = ['$top', '$filter', '$orderby', '$expand'] as const;
+
+const keptQuery = (q: Record<string, string | undefined>): string =>
+  NEXT_LINK_KEPT_OPTIONS.flatMap(name => (q[name] == null ? [] : [`&${name}=${encodeURIComponent(String(q[name]))}`])).join('');
+
+/** Serve one resource's collection from the app. */
+const mountResource = (app: express.Express, opts: ReplicationMockOptions): void => {
   const tsField = opts.timestampField ?? 'ModificationTimestamp';
-  const app = express();
   const pageRequests = { count: 0 };
 
   app.get(`/${opts.resource}`, (req, res) => {
@@ -126,10 +141,27 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
       value: page
     };
     if (skip + pageSize < ordered.length) {
-      body['@odata.nextLink'] = `${base}/${opts.resource}?$skip=${skip + pageSize}`;
+      body['@odata.nextLink'] = `${base}/${opts.resource}?$skip=${skip + pageSize}${opts.nextLinkKeepsQuery ? keptQuery(q) : ''}`;
     }
     res.json(body);
   });
+};
+
+/**
+ * One root serving every resource given, each from its own path. `onRequest` is told every request the server
+ * receives, the count probes included, as its path and query and its `Prefer` header, so a test can compare what two
+ * runs asked for and in what order.
+ */
+export const startMultiResourceReplicationMockServer = async (
+  resources: ReadonlyArray<ReplicationMockOptions>,
+  { onRequest }: { readonly onRequest?: (request: string) => void } = {}
+): Promise<ReplicationMockServer> => {
+  const app = express();
+  app.use((req, _res, next) => {
+    onRequest?.(`${req.originalUrl} [${req.get('prefer') ?? ''}]`);
+    next();
+  });
+  for (const resource of resources) mountResource(app, resource);
 
   return new Promise<ReplicationMockServer>(resolve => {
     const server: Server = app.listen(0, () => {
@@ -142,3 +174,6 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
     });
   });
 };
+
+export const startReplicationMockServer = async (opts: ReplicationMockOptions): Promise<ReplicationMockServer> =>
+  startMultiResourceReplicationMockServer([opts]);
