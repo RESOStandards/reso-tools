@@ -73,8 +73,8 @@ const createReplicationState = () => {
   let _metadataMap = {};
 
   /**
-   * The schema validation results of every strategy of this run that accumulated them (relaxed mode), merged.
-   * Null until the first one does.
+   * The schema validation results of every strategy of this run that ran to its end, merged: everything a relaxed
+   * strategy found, and the warnings of a strict strategy that passed. Null until the first one does.
    */
   let _schemaValidationResults = null;
 

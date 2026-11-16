@@ -4,10 +4,10 @@
  * described the last strategy alone: a finding only an earlier strategy reached was gone from the report, in the
  * relaxed mode that exists to list everything.
  *
- * Relaxed mode now accumulates across the calls of one run. The rule for counts is conservative, because the calls
- * fetch overlapping records and nothing yet identifies the same violation seen twice: each entry reports the largest
- * count any one strategy gave it, never the sum. Strict mode is untouched: it stops at the first page with an error
- * and reports that call's findings.
+ * A call that runs to its end now accumulates across the calls of one run. The rule for counts is conservative,
+ * because the calls fetch overlapping records and nothing yet identifies the same violation seen twice: each entry
+ * reports the largest count any one strategy gave it, never the sum. Strict mode still stops at the first page with
+ * an error and reports that call's findings; a strict call that passes accumulates its warnings.
  */
 
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -322,7 +322,7 @@ describe('merging the schema results of two strategies', () => {
   });
 });
 
-describe('a strict run is unchanged by the accumulation', () => {
+describe('a strict run fails fast and otherwise accumulates', () => {
   it('stops at the first page with an error and reports that call alone, on a state that already ran a strategy', async () => {
     const base = await setUp({ records: [OLD1, NEW1] });
     const state = createReplicationStateServiceInstance();
@@ -344,10 +344,9 @@ describe('a strict run is unchanged by the accumulation', () => {
     expect(afterSecond.totalErrors).toBe(3);
   });
 
-  // Pinned as it is today, not endorsed: a strict run that passes writes its warnings per call, so the file describes
-  // the last strategy that had any. Decision 6 scopes the accumulation to relaxed mode; whether a passing strict run
-  // should list every strategy's warnings is an open question recorded with this change.
-  it('writes a passing call’s warnings from that call alone', async () => {
+  // Warnings never fail a strict run, so a strict run that passes accumulates them as a relaxed run does: its
+  // warnings file is the union across its strategies, counted by the same rule.
+  it('lists the warnings of every strategy of a passing strict run', async () => {
     const base = await setUp({
       records: [
         { ListingKey: 'OLD1', ModificationTimestamp: OLD },
@@ -358,11 +357,41 @@ describe('a strict run is unchanged by the accumulation', () => {
     const state = createReplicationStateServiceInstance();
 
     await replicateWith(base, state, { strategy: 'TopAndSkip', strictMode: true });
+    await replicateWith(base, state, { strategy: 'NextLink', strictMode: true });
     await replicateWith(base, state, { strategy: 'NextLink', strictMode: true, filter: RECENT_ONLY });
 
+    expect(await readdir(base.outputPath)).not.toContain(ERRORS_FILE);
     const report = await readReport(base.outputPath, WARNINGS_FILE);
-    expect(messagesMatching(report.warnings, RESOURCE_MISMATCH)).toHaveLength(0);
+    // the first two walks met the same page: one warning, not two
+    expect(messagesMatching(report.warnings, RESOURCE_MISMATCH)).toHaveLength(1);
     expect(messagesMatching(report.warnings, MALFORMED)).toHaveLength(1);
+    expect(report.totalWarnings).toBe(2);
+  });
+
+  // A strict failure is the failing call's own findings: the warnings an earlier, passing strategy accumulated are
+  // not added to the file the failure writes.
+  it('fails with the failing call’s findings alone after a strategy that passed with warnings', async () => {
+    const base = await setUp({
+      records: [{ ListingKey: 'OLD1', ModificationTimestamp: OLD }, NEW1],
+      pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
+    });
+    const state = createReplicationStateServiceInstance();
+
+    // The old record alone: a warning, no error.
+    await replicateWith(base, state, {
+      strategy: 'NextLink',
+      strictMode: true,
+      filter: `ModificationTimestamp lt ${thisYear - 2}-01-01T00:00:00.000Z`
+    });
+    // The recent record alone: it fails.
+    await expect(replicateWith(base, state, { strategy: 'NextLink', strictMode: true, filter: RECENT_ONLY })).rejects.toThrow(
+      /Schema validation errors found in the Property payload: 1 error, 1 warning, 1 distinct type/
+    );
+
+    const report = await readReport(base.outputPath, ERRORS_FILE);
+    expect(report.totalErrors).toBe(1);
     expect(report.totalWarnings).toBe(1);
+    expect(messagesMatching(report.warnings, MALFORMED)).toHaveLength(1);
+    expect(messagesMatching(report.warnings, RESOURCE_MISMATCH)).toHaveLength(0);
   });
 });
