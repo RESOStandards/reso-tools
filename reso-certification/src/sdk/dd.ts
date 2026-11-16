@@ -55,7 +55,7 @@ import certUtils from '../legacy/index.js';
 // @ts-expect-error — legacy CJS
 import certUtilsReplicationUtils from '../legacy/lib/replication/utils.js';
 
-const { replicate } = certUtils;
+const { replicate, replicateJobs } = certUtils;
 const { createReplicationStateServiceInstance } = certUtilsCommon;
 const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils;
 const { getReferenceMetadata } = certUtilsEtl as { getReferenceMetadata: (version: string) => DdReference };
@@ -613,24 +613,42 @@ const replicateReportingSchemaFailures = async (
   try {
     await replicate(settings);
   } catch (err) {
-    const failure = schemaValidationFailureOf(err);
-    if (!failure) throw err;
-    const { totalErrors = 0, totalWarnings = 0 } = failure.stats ?? {};
-    const counted = [plural(totalErrors, 'error'), ...(totalWarnings > 0 ? [plural(totalWarnings, 'warning')] : [])];
-    const message = err instanceof Error ? err.message : 'Schema validation failed';
-    return {
-      context: ctx as DDContext,
-      // The summary states the problem, not the strategy. It is what the step line and the
-      // not-eligible reason both render, and naming the strategy there described how the run was
-      // reading the server at the moment it stopped rather than why it stopped.
-      status: 'failed',
-      summary: message,
-      errors: [`${message} – ${counted.join(' and ')} recorded in ${SCHEMA_VALIDATION_ERRORS_FILENAME}. Strategy: ${summary}.`],
-      // The records it received before stopping were tested, and a failed step reports them like a passing one.
-      counts: { [RECORDS_TESTED]: recordsReceived(ctx) }
-    };
+    const failed = schemaFailureOutput(ctx, err, summary);
+    if (!failed) throw err;
+    return failed;
   }
   return { context: ctx as DDContext, summary };
+};
+
+/**
+ * The failed step a strict-mode schema failure is reported as, or undefined when the error is anything else.
+ *
+ * `strategySummary` names the strategy that was running when the run stopped. `summariesBefore` are the summaries of
+ * the strategies that finished before it: when the strategies were separate functions of the step, the pipeline
+ * joined those in front of the failure's own summary, so a function that runs them all does the same.
+ */
+const schemaFailureOutput = (
+  ctx: Readonly<DDContext>,
+  err: unknown,
+  strategySummary: string,
+  summariesBefore: ReadonlyArray<string> = []
+): StepOutput<DDContext> | undefined => {
+  const failure = schemaValidationFailureOf(err);
+  if (!failure) return undefined;
+  const { totalErrors = 0, totalWarnings = 0 } = failure.stats ?? {};
+  const counted = [plural(totalErrors, 'error'), ...(totalWarnings > 0 ? [plural(totalWarnings, 'warning')] : [])];
+  const message = err instanceof Error ? err.message : 'Schema validation failed';
+  return {
+    context: ctx as DDContext,
+    // The summary states the problem, not the strategy. It is what the step line and the
+    // not-eligible reason both render, and naming the strategy there described how the run was
+    // reading the server at the moment it stopped rather than why it stopped.
+    status: 'failed',
+    summary: [...summariesBefore, message].join('; '),
+    errors: [`${message} – ${counted.join(' and ')} recorded in ${SCHEMA_VALIDATION_ERRORS_FILENAME}. Strategy: ${strategySummary}.`],
+    // The records it received before stopping were tested, and a failed step reports them like a passing one.
+    counts: { [RECORDS_TESTED]: recordsReceived(ctx) }
+  };
 };
 
 const replicateTimestampDesc =
@@ -688,7 +706,110 @@ const replicateNextLinkFiltered =
     );
   };
 
-/** Build the replication step with all strategies as test functions. Exported so a test can see it ends with the record check. */
+/** One strategy of the run: what the replication driver is given, and what the step says about it. */
+interface DDReplicationJob {
+  readonly strategy: string;
+  readonly top?: number;
+  readonly maxPageSize?: number;
+  readonly filter?: string;
+  readonly orderby?: string;
+  /** The strategy named in the live progress while this job runs. The desktop shows it. */
+  readonly label: string;
+  /** This job's part of the step summary, and the strategy named when a strict run stops in it. */
+  readonly summary: string;
+}
+
+/**
+ * The strategies a Data Dictionary run replicates with, in the order they run: ModificationTimestamp descending, and
+ * from Data Dictionary 2.0 on, NextLink in the server's natural order and NextLink from three years back going
+ * forward. The labels and summaries are the ones the three separate strategy functions used.
+ *
+ * The lookback's cutoff is worked out here, when the step starts, not when its job does. It is a year boundary, so
+ * the two differ only for a run in progress as the year changes.
+ */
+const ddReplicationJobs = (version: DDVersion): ReadonlyArray<DDReplicationJob> => {
+  const pageSize = version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
+  const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
+  return [
+    {
+      strategy: REPLICATION_STRATEGIES.TIMESTAMP_DESC,
+      top: pageSize,
+      label: 'Timestamp Descending',
+      summary: `Timestamp Descending with $top=${pageSize}`
+    },
+    ...(version !== '1.7'
+      ? [
+          {
+            strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+            maxPageSize: DEFAULT_PAGE_SIZE_V20,
+            label: 'NextLink',
+            summary: `NextLink with maxPageSize=${DEFAULT_PAGE_SIZE_V20}`
+          },
+          {
+            strategy: REPLICATION_STRATEGIES.NEXT_LINK,
+            maxPageSize: DEFAULT_PAGE_SIZE_V20,
+            filter: `ModificationTimestamp ge ${cutoffDate}`,
+            orderby: 'ModificationTimestamp asc',
+            label: 'NextLink (modified-since filter)',
+            summary: `NextLink (modified-since filter, ${DEFAULT_YEARS_BACK}yr lookback)`
+          }
+        ]
+      : [])
+  ];
+};
+
+/** The position of the job a replication error came from, which the driver attaches to what it throws. */
+const stoppedJobIndexOf = (err: unknown): number | undefined => {
+  if (typeof err !== 'object' || err === null || !('replicationJob' in err)) return undefined;
+  const job = err.replicationJob;
+  if (typeof job !== 'object' || job === null || !('index' in job)) return undefined;
+  return typeof job.index === 'number' ? job.index : undefined;
+};
+
+/**
+ * Replicate with every strategy of the run, as jobs of one call to the replication driver.
+ *
+ * The driver runs the jobs one after another, each to its end, as the separate strategy functions did, so the
+ * reports are the same. What the step says is kept the same here: the live progress names the running job by its
+ * label, the summary is the strategies' summaries joined as the pipeline joined them, and a strict failure names the
+ * strategy it stopped in, after the summaries of the ones that had finished.
+ */
+const replicateAllStrategies =
+  (config: DDConfig): TestFunction<DDContext> =>
+  async (ctx, onProgress) => {
+    const jobs = ddReplicationJobs(ctx.version);
+    const summaries = jobs.map(job => job.summary);
+    try {
+      await replicateJobs({
+        ...buildReplicationSettings(ctx, config),
+        // DD 1.7 predates the schema the validator is generated from, so it stays off there. For
+        // every other version validation always runs; strictMode decides whether errors fail the run.
+        jsonSchemaValidation: ctx.version !== '1.7',
+        jobs,
+        onProgress: (info: Record<string, unknown>) =>
+          onProgress({
+            step: 'sub:replicate',
+            status: 'running',
+            message: formatReplicationProgress(info, typeof info.jobLabel === 'string' ? info.jobLabel : '')
+          })
+      });
+    } catch (err) {
+      const stoppedAt = stoppedJobIndexOf(err);
+      const failed =
+        stoppedAt === undefined
+          ? schemaFailureOutput(ctx, err, summaries.join('; '))
+          : schemaFailureOutput(ctx, err, summaries[stoppedAt], summaries.slice(0, stoppedAt));
+      if (!failed) throw err;
+      return failed;
+    }
+    return { context: ctx as DDContext, summary: summaries.join('; ') };
+  };
+
+/**
+ * Build the replication step. In sequence, the default, the strategies are jobs of one function. With
+ * `parallelReplicate` they are still three calls run at once; that branch goes when the driver rotates its jobs.
+ * Exported so a test can see it ends with the record check.
+ */
 export const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> => ({
   name: 'Replicate and validate',
   // Init must run first (sequential), then replication strategies can run
@@ -710,11 +831,7 @@ export const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> 
           },
           checkRecordsReceived
         ]
-      : [
-          replicateTimestampDesc(config),
-          ...(config.version !== '1.7' ? [replicateNextLink(config), replicateNextLinkFiltered(config)] : []),
-          checkRecordsReceived
-        ])
+      : [replicateAllStrategies(config), checkRecordsReceived])
   ]
 });
 
