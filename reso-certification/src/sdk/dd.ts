@@ -854,7 +854,7 @@ export const runDDCompliance = async (config: DDConfig, onProgress?: (progress: 
 
   const pipeline = createDDPipeline(config);
   const initialContext: DDContext = {
-    serverUrl: normalizeServiceRoot(config.server.url),
+    serverUrl: config.server.url,
     version: config.version,
     outputPath
   };

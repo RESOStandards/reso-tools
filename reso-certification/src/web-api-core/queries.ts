@@ -257,7 +257,13 @@ const buildErrorUrl = (serverUrl: string, resource: string, scenario: ErrorScena
 
 // ── Structural query builders ──
 
-const buildStructuralUrl = (serverUrl: string, resource: string, params: TestParams, assertion: string): QuerySpec | undefined => {
+const buildStructuralUrl = (
+  serverUrl: string,
+  resource: string,
+  params: TestParams,
+  assertion: string,
+  serviceRootAsGiven: string
+): QuerySpec | undefined => {
   switch (assertion) {
     case 'metadata':
       // URL kept for the scenario dispatcher (so it knows this assertion
@@ -268,7 +274,8 @@ const buildStructuralUrl = (serverUrl: string, resource: string, params: TestPar
       // formatting here — it'll drift.
       return { url: `${serverUrl}/$metadata`, selectFields: [] };
     case 'service-document':
-      return { url: serverUrl, selectFields: [] };
+      // The root itself, as the user gave it. Nothing is joined onto it, so it is not normalized.
+      return { url: serviceRootAsGiven, selectFields: [] };
     case 'fetch-by-key':
       return { url: `${serverUrl}/${resource}('${params.keyValue}')`, selectFields: [params.keyField] };
     case 'select': {
@@ -327,11 +334,20 @@ const buildStringFunctionUrl = (
 /**
  * Build the OData query URL for a scenario.
  * Returns undefined if required test params are missing (scenario should be skipped).
+ *
+ * `serverUrl` is the root every path is joined onto, already normalized. `serviceRootAsGiven` is the root as the user
+ * wrote it, for the one scenario that requests the root itself.
  */
-const buildQueryForCategory = (serverUrl: string, resource: string, scenario: CoreScenario, params: TestParams): QuerySpec | undefined => {
+const buildQueryForCategory = (
+  serverUrl: string,
+  resource: string,
+  scenario: CoreScenario,
+  params: TestParams,
+  serviceRootAsGiven: string
+): QuerySpec | undefined => {
   switch (scenario.category) {
     case 'structural':
-      return buildStructuralUrl(serverUrl, resource, params, scenario.assertion);
+      return buildStructuralUrl(serverUrl, resource, params, scenario.assertion, serviceRootAsGiven);
     case 'filter':
       return buildFilterUrl(serverUrl, resource, params, scenario);
     case 'orderby':
@@ -430,4 +446,4 @@ export const buildScenarioQuery = (
   scenario: CoreScenario,
   params: TestParams
 ): QuerySpec | undefined =>
-  scopeToOriginatingSystem(buildQueryForCategory(normalizeServiceRoot(serverUrl), resource, scenario, params), scenario, params);
+  scopeToOriginatingSystem(buildQueryForCategory(normalizeServiceRoot(serverUrl), resource, scenario, params, serverUrl), scenario, params);

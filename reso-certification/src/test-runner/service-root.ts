@@ -3,8 +3,11 @@
  *
  * A root arrives as typed: `http://127.0.0.1:8801` or `http://127.0.0.1:8801/`, with or without a path. Request URLs
  * are built by joining `/${resource}` onto it, so a root that ends in a slash produced `http://127.0.0.1:8801//Property`,
- * a different path that a server may answer 404. Every place that starts a run or builds a request URL from the root
- * passes it through here first.
+ * a different path that a server may answer 404. Every place that joins a path onto the root passes it through here
+ * first.
+ *
+ * Only a join. A request for the root itself (the service check, the service document) uses the root exactly as the
+ * user gave it: a server may answer one form and not the other, and a run must test what it was pointed at.
  */
 
 /** A scheme and authority (`http://host:port`), the path after it, and a query or fragment, each possibly empty. */

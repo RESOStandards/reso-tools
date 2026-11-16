@@ -1,8 +1,10 @@
 /**
  * A service root may be given with a trailing slash (`http://127.0.0.1:8801/`). The engine joined paths onto it as
- * text, so a Web API Core run requested `http://127.0.0.1:8801//Property`, which a server is free to answer 404. The
- * root is normalized where a run starts and where a request URL is built from it: the slash at the end of its path
- * goes, and a query or fragment is left as it was given.
+ * text, so a Web API Core run requested `http://127.0.0.1:8801//Property`, which a server is free to answer 404.
+ *
+ * The root is normalized where a path is joined onto it, and only there: the slash at the end of its path goes, and a
+ * query or fragment is left as it was given. A request for the root itself (the service check and the service
+ * document) is made on the root exactly as the user gave it, as it always was, so a run tests what it tested before.
  */
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -91,9 +93,10 @@ describe('a Web API Core run on a service root with a trailing slash', () => {
   });
 
   it('requests the same resource paths as the run without the slash', async () => {
-    // The path up to its query: a query can carry the time of the run, which differs between two runs.
+    // The path up to its query: a query can carry the time of the run, which differs between two runs. The root
+    // itself is left out here; the next test is about it.
     const resourcePaths = (calls: ReadonlyArray<string>): ReadonlyArray<string> =>
-      [...new Set(pathsOf(calls).map(path => path.split('?')[0]))].sort();
+      [...new Set(pathsOf(calls).map(path => path.split('?')[0]))].filter(path => path !== '' && path !== '/').sort();
 
     const plain = installCoreMockServer(BASE, servedRows);
     await runCoreCompliance(coreConfig(BASE));
@@ -102,7 +105,25 @@ describe('a Web API Core run on a service root with a trailing slash', () => {
 
     const slashed = installCoreMockServer(BASE, servedRows);
     await runCoreCompliance(coreConfig(`${BASE}/`));
+    expect(expected.length).toBeGreaterThan(2);
     expect(resourcePaths(slashed.calls)).toEqual(expected);
+  });
+
+  // The service check and the service document are requests for the root itself. Nothing is joined onto it, so it is
+  // requested as given: a server may answer its service document at `/odata/` and not at `/odata`.
+  it('requests the root itself exactly as the user gave it', async () => {
+    const rootRequests = (calls: ReadonlyArray<string>): ReadonlyArray<string> => [
+      ...new Set(calls.filter(call => call === BASE || call === `${BASE}/`))
+    ];
+
+    const slashed = installCoreMockServer(BASE, servedRows);
+    await runCoreCompliance(coreConfig(`${BASE}/`));
+    expect(rootRequests(slashed.calls)).toEqual([`${BASE}/`]);
+    slashed.restore();
+
+    const plain = installCoreMockServer(BASE, servedRows);
+    await runCoreCompliance(coreConfig(BASE));
+    expect(rootRequests(plain.calls)).toEqual([BASE]);
   });
 
   it('builds a scenario query and a Lookup query on the root, not on the root and a slash', () => {
@@ -113,11 +134,18 @@ describe('a Web API Core run on a service root with a trailing slash', () => {
     expect(buildScenarioQuery('http://127.0.0.1:8801/', 'Property', byKey, params)?.url).toBe("http://127.0.0.1:8801/Property('K1')");
     expect(buildLookupUrl('http://127.0.0.1:8801/', 'StandardStatus')).toBe(buildLookupUrl('http://127.0.0.1:8801', 'StandardStatus'));
     expect(buildLookupUrl('http://127.0.0.1:8801/', 'StandardStatus')).toMatch(/^http:\/\/127\.0\.0\.1:8801\/Lookup\?/);
+    // the service document scenario joins nothing, so its URL is the root as given
+    const serviceDocument = { id: 'service-document', category: 'structural', assertion: 'service-document' } as unknown as Parameters<
+      typeof buildScenarioQuery
+    >[2];
+    expect(buildScenarioQuery('http://127.0.0.1:8801/', 'Property', serviceDocument, params)?.url).toBe('http://127.0.0.1:8801/');
+    expect(buildScenarioQuery('http://127.0.0.1:8801', 'Property', serviceDocument, params)?.url).toBe('http://127.0.0.1:8801');
   });
 });
 
-describe('each compliance entry point starts its run on the normalized root', () => {
-  // The run's context is what every step builds its requests from, and what the reports record as the server.
+describe('each compliance entry point keeps the root the user gave', () => {
+  // The run's context is what the service check requests and what the reports record as the server. The joins
+  // normalize for themselves.
   const options = { outputDir, skipHealthCheck: true };
   const server = { url: `${BASE}/`, auth: AUTH };
 
@@ -130,14 +158,14 @@ describe('each compliance entry point starts its run on the normalized root', ()
       server,
       options: { ...options, outputDir }
     });
-    expect(result.context.serverUrl).toBe(BASE);
+    expect(result.context.serverUrl).toBe(`${BASE}/`);
   });
 
   it('Data Dictionary', async () => {
     installCoreMockServer(BASE);
     const config = { endorsement: 'dd', version: '2.0', runVariations: false, requestDelay: 0, server, options: { ...options, outputDir } };
     const result = await runDDCompliance(config as unknown as DDConfig);
-    expect(result.context.serverUrl).toBe(BASE);
+    expect(result.context.serverUrl).toBe(`${BASE}/`);
   });
 
   it('EntityEvent', async () => {
@@ -145,14 +173,14 @@ describe('each compliance entry point starts its run on the normalized root', ()
     installCoreMockServer(BASE, { metadataStatus: 500 });
     const config = { endorsement: 'entity-event', server, options: { ...options, outputDir } };
     const result = await runEntityEventCompliance(config as unknown as EntityEventConfig);
-    expect(result.context.serverUrl).toBe(BASE);
+    expect(result.context.serverUrl).toBe(`${BASE}/`);
   });
 
   it('Add/Edit', async () => {
     installCoreMockServer(BASE);
     const config = { endorsement: 'add-edit', resource: 'Property', payloads: {}, server, options: { ...options, outputDir } };
     const result = await runAddEditCompliance(config as unknown as AddEditConfig);
-    expect(result.context.serverUrl).toBe(BASE);
+    expect(result.context.serverUrl).toBe(`${BASE}/`);
   });
 });
 

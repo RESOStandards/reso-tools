@@ -12,7 +12,6 @@ import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, getEntityType, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
 import { createCapturingRequester } from '../test-runner/payload-capture.js';
 import { type ODataRequester, createCertSession, createSessionRequester } from '../test-runner/requester.js';
-import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import type { ParsedMetadata } from '../test-runner/types.js';
 import { declaredTypesOf } from '../web-api-core/declared-types.js';
 import { type FieldOverrideSummary, parseFieldOverrides, summarizeFieldOverrides } from '../web-api-core/field-override.js';
@@ -1053,7 +1052,7 @@ export const runCoreCompliance = async (config: CoreConfig, onProgress?: (progre
   const resourcesNamed = normalizedConfig.resources !== undefined;
   const outputPath = await prepareOutputDir('web-api-core', version, normalizedConfig);
   const initialContext: CoreContext = {
-    serverUrl: normalizeServiceRoot(normalizedConfig.server.url),
+    serverUrl: normalizedConfig.server.url,
     version,
     enumMode: normalizedConfig.enumMode ?? 'auto',
     resources: normalizedConfig.resources ?? [],

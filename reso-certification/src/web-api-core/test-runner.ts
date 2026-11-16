@@ -2190,7 +2190,9 @@ const runServiceDocumentProbe = async (
   start: number,
   requester: ODataRequester
 ): Promise<{ readonly result: ScenarioResult; readonly served: ReadonlySet<string> | undefined }> => {
-  const url = normalizeServiceRoot(serverUrl);
+  // The root itself, exactly as the user gave it: nothing is joined onto it here, and a server may answer its
+  // service document with the trailing slash and not without (or the reverse).
+  const url = serverUrl;
   const assertions: AssertionResult[] = [];
   try {
     const response = await requester.request({ method: 'GET', url, authToken });
