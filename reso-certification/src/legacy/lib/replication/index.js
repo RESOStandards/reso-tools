@@ -364,6 +364,9 @@ const replicate = async ({
                   ...request,
                   ...otherIteratorInfo,
                   requestUri,
+                  // Recorded on the response entry, so a reader can tell which strategy fetched a page without
+                  // working it out from the URL. scorePayload always read it; it was never passed.
+                  strategy,
                   jsonData: responseJson,
                   hasError,
                   replicationStateServiceInstance: REPLICATION_STATE_SERVICE
