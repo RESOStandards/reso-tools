@@ -1,61 +1,65 @@
 'use strict';
 
 const { buildMetadataMap } = require('../../../common');
-const { getRandomInt } = require('../utils');
 const { mergeSchemaValidationResults } = require('../schema-results');
 
-// Node has a 2^24 record limit on hashmaps, so the default supports around 336m hashes
-const NUM_RECORD_COUNT_HASHMAPS = 20;
-
 /**
- * One run's replication state: the availability map, the record hashes, the responses, the page and top-level
+ * One run's replication state: the availability map, the record set, the responses, the page and top-level
  * counts, and the metadata map. Each call returns new state that shares nothing with any other call.
  *
  * This module used to hold the state at module level, so every caller got the same object and a second run in the
  * same process (a config file with several Data Dictionary entries) inherited the first run's responses and record
  * hashes. The availability report is built from this state, so it reported records the run never received.
+ *
+ * The record set is GIVEN, never built here. It is a `DistinctKeySet` (`src/state/distinct-key-set.ts`) whose
+ * memory ceiling belongs to whoever owns the run: one run in a container can take more than one of several runs on
+ * a desktop, and nothing in here can know which it is. So a missing set is an error, not a default.
+ *
+ * @param {Object} options
+ * @param {Object} options.recordKeySet the set that answers "has this run counted this record": `add`, `stats`
  */
-const createReplicationState = () => {
+const createReplicationState = ({ recordKeySet } = {}) => {
+  if (typeof recordKeySet?.add !== 'function' || typeof recordKeySet?.stats !== 'function') {
+    throw new Error(
+      'Replication state needs a record set: pass { recordKeySet } to createReplicationStateServiceInstance. ' +
+        'The caller that owns the run creates it (createRecordKeySet in src/state/record-key-set.ts), because the ' +
+        'memory it may use is the caller\'s decision.'
+    );
+  }
+
   /**
    * Resource availability map has a structure of resourceName, fieldName, lookups, lookupValue
    */
   const _resourceAvailabilityMap = {};
 
   /**
-   * Used to detect whether we've pulled the same record using different strategies
-   * Format of each entry is recordHash: count
+   * Whether this run has counted a record, so one fetched again (by another strategy, or by a timestamp walk at a
+   * page boundary) is counted once. `recordKeySet` replaced twenty plain objects scanned on every lookup.
    *
-   * TODO (DD 2.2, with the sampling and schema-validation rewrite): the count is vestigial.
-   * Dedup itself is correct and this is not a live defect, but four things here are worth
-   * carrying into the rewrite rather than rediscovering:
+   * What is still true of the key, for the DD 2.2 rewrite:
    *
-   *   1. The stored value is always 1. `addOrIncrementHashValue` increments `val`, which is a
-   *      local copy of the number, so the write never reaches the map. Nothing reads a count
-   *      either: the only consumer is `hashExists`, which is `!!value`, and 1 is truthy. So the
-   *      name, its doc, and the "recordHash: count" line above all describe a tally that is not
-   *      kept. Either make it real or drop the pretense, but do not leave it reading as collected.
+   *   1. The key is `hashJsonData({ modelName, parentModelName, normalizedRecord })`: a SHA-256 truncated to 15 hex
+   *      characters, 60 bits (`NUM_SHORT_HASH_CHARACTERS` is 16 and is sliced to 16 - 1). The set hashes that
+   *      string again to its own width. Two records that collide read as one, so the second is not counted:
+   *      an undercount, which is the safe direction. Widening the set alone buys nothing; the 60 bits come first.
    *
-   *   2. A count here could never have measured cross-path overlap anyway. `hashJsonData` keys on
-   *      { modelName, parentModelName, normalizedRecord }, so the same record reached standalone
-   *      and reached through an expansion hashes differently and is two entries, not a repeat.
-   *      Measuring standalone-versus-expansion overlap needs a second key that excludes
-   *      parentModelName, which is a separate structure and roughly doubles the entry count.
+   *   2. `parentModelName` is in the key, so a record reached alone and reached through an expansion are two
+   *      entries, not a repeat. That is deliberate (availability is kept per parent), and it means this set cannot
+   *      measure standalone-versus-expansion overlap. That needs a second key without the parent.
    *
-   *   3. Bucket 19 is never written. `getRandomInt` is exclusive (Math.floor(Math.random() * max))
-   *      and is called with `length - 1`, so it returns 0..18. Capacity is 19 maps, not 20.
+   *   3. The SHA-256 step is kept only so the keys match the ones this replaced. The set's own hash is enough and
+   *      about five times faster; dropping the SHA-256 belongs with the sampling rewrite.
    *
-   *   4. Each lookup scans every map, and both call sites in utils.js run two scans per record:
-   *      `hashExists` then `addOrIncrementHashValue`, which repeats the same scan. Choosing the
-   *      bucket deterministically from the hash (hex characters are uniform, so the fill balances
-   *      itself) makes it one lookup, fixes 3, and removes the double scan.
-   *
-   * The capacity note below is worth keeping in mind alongside this: at 20 maps the ceiling is
-   * ~336m entries, but the hash is truncated to 15 hex characters, so the birthday collision
-   * probability near that ceiling is a few percent. Collisions undercount, which is the safe
-   * direction by design, but it does mean adding maps buys no usable headroom without widening
-   * the hash.
+   * Never window this set to a page or a walk: a server could then re-serve dense records on later pages and be
+   * counted again.
    */
-  const _recordCountHashMaps = [];
+  const addRecordKey = key => recordKeySet.add(key);
+
+  /**
+   * The record set's occupancy and whether it reached its ceiling, for the report and the log.
+   * @returns the set's stats
+   */
+  const getRecordDeduplicationStats = () => recordKeySet.stats();
 
   /**
    * Tracks page responses
@@ -95,17 +99,9 @@ const createReplicationState = () => {
   const _topLevelResourceCounts = {};
 
   /**
-   * Initializes this run's replication state
+   * Initializes this run's replication state. Nothing is left to prepare; kept because callers call it.
    */
   const init = () => {
-    if (_isInitialized) {
-      return;
-    }
-
-    for (let i = 0; i < NUM_RECORD_COUNT_HASHMAPS; i++) {
-      _recordCountHashMaps.push({});
-    }
-
     _isInitialized = true;
   };
 
@@ -114,38 +110,6 @@ const createReplicationState = () => {
    * @returns current instance
    */
   const getResourceAvailabilityMap = () => _resourceAvailabilityMap;
-
-  const _getHashValue = (value) => {
-    for (const recordCountHashMap of _recordCountHashMaps) {
-      if (!!(recordCountHashMap && typeof recordCountHashMap === 'object' && !!recordCountHashMap?.[value])) {
-        return recordCountHashMap[value];
-      }
-    }
-
-    return null;
-  };
-
-  /**
-   * Checks to see whether a hash value exists in the record count hash map
-   * 
-   * @param {String} value the string hash value to check for 
-   * @returns true if hash exists, false otherwise
-   */
-  const hashExists = (value) => !!_getHashValue(value);
-
-  /**
-   * Adds and increments the count for each found hashed record
-   * @param {String} value the hash value to add 
-   */
-  const addOrIncrementHashValue = (value) => {
-    let val = _getHashValue(value);
-
-    if (!val) {
-      _recordCountHashMaps[getRandomInt(_recordCountHashMaps?.length - 1)][value] = 1;
-    } else {
-      val++;
-    }
-  };
 
   /**
    * Responses accessor
@@ -236,8 +200,8 @@ const createReplicationState = () => {
     init,
     getIsInitialized,
     getResourceAvailabilityMap,
-    hashExists,
-    addOrIncrementHashValue,
+    addRecordKey,
+    getRecordDeduplicationStats,
     getResponses,
     getResourcePageCount,
     incrementResourcePageCount,

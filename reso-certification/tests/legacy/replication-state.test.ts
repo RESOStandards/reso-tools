@@ -13,12 +13,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runReplicate } from '../../src/cli/replicate-command.js';
-import certUtilsCommon from '../../src/legacy/common.js';
+import { newReplicationState } from '../helpers/replication-state.js';
 import { startReplicationMockServer } from './replication-mock-server.js';
-
-const { createReplicationStateServiceInstance } = certUtilsCommon as {
-  createReplicationStateServiceInstance: () => { getResponses: () => Array<Record<string, unknown>> };
-};
 
 const RESOURCE = 'Property';
 
@@ -66,9 +62,9 @@ const fieldFrequencies = (report: Record<string, unknown>): ReadonlyArray<number
 
 describe('replication state', () => {
   it('is a new object for each run, sharing nothing with the one before', () => {
-    const first = createReplicationStateServiceInstance();
+    const first = newReplicationState<{ getResponses: () => Array<Record<string, unknown>> }>();
     first.getResponses().push({ resourceName: RESOURCE, recordCount: 5 });
-    const second = createReplicationStateServiceInstance();
+    const second = newReplicationState<{ getResponses: () => Array<Record<string, unknown>> }>();
     expect(second).not.toBe(first);
     expect(second.getResponses()).toEqual([]);
   });

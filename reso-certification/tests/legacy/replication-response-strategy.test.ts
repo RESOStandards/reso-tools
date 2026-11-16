@@ -9,14 +9,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import certUtilsCommon from '../../src/legacy/common.js';
 import certUtils from '../../src/legacy/index.js';
+import { newReplicationState } from '../helpers/replication-state.js';
 import { startReplicationMockServer } from './replication-mock-server.js';
 
 type ResponseEntry = Record<string, unknown>;
-const { createReplicationStateServiceInstance } = certUtilsCommon as {
-  createReplicationStateServiceInstance: () => { getResponses: () => ReadonlyArray<ResponseEntry> };
-};
 const { replicate } = certUtils as { replicate: (options: Record<string, unknown>) => Promise<void> };
 
 const RESOURCE = 'Property';
@@ -82,7 +79,7 @@ describe('a response entry names the strategy that fetched it', () => {
     '%s: on the run’s state and in the responses report',
     async strategy => {
       const base = await setUp();
-      const state = createReplicationStateServiceInstance();
+      const state = newReplicationState<{ getResponses: () => ReadonlyArray<ResponseEntry> }>();
       await replicateWith(base, state, strategy);
 
       const logged = state.getResponses();
@@ -96,7 +93,7 @@ describe('a response entry names the strategy that fetched it', () => {
 
   it('tells the strategies of one run apart without reading a URL', async () => {
     const base = await setUp();
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState<{ getResponses: () => ReadonlyArray<ResponseEntry> }>();
     await replicateWith(base, state, 'TopAndSkip');
     const afterFirst = state.getResponses().length;
     await replicateWith(base, state, 'NextLink');
@@ -111,7 +108,7 @@ describe('a response entry names the strategy that fetched it', () => {
   // gains nothing.
   it('adds the one field and changes nothing else a reader sees', async () => {
     const base = await setUp();
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState<{ getResponses: () => ReadonlyArray<ResponseEntry> }>();
     await replicateWith(base, state, 'TopAndSkip');
 
     const [entry] = await writtenResponses(base.outputPath);

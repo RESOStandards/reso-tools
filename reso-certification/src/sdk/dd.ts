@@ -14,6 +14,7 @@ import type { MetadataReport } from '@reso-standards/reso-metadata-utils';
 import { runDdMetadataChecks } from '../metadata/dd-metadata-checks.js';
 import type { DdReference } from '../metadata/dd-metadata-checks.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
+import { createRecordKeySet } from '../state/record-key-set.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
 import { normalizeServiceRoot } from '../test-runner/service-root.js';
@@ -461,21 +462,25 @@ const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
 // Run sequentially by default, or in parallel when concurrency > 1.
 
 /** Initialize replication state service and copy schema validation settings. */
-const initReplicationState: TestFunction<DDContext> = async ctx => {
-  if (!ctx.replicationStateService) {
-    const settingsFile = 'schema-validation-settings.json';
-    if (!existsSync(settingsFile)) {
-      const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-      const sourcePaths = [join(packageRoot, settingsFile), join(packageRoot, 'src', 'legacy', settingsFile)];
-      const sourcePath = sourcePaths.find(p => existsSync(p));
-      if (sourcePath) {
-        await copyFile(sourcePath, settingsFile);
+const initReplicationState =
+  (config: DDConfig): TestFunction<DDContext> =>
+  async ctx => {
+    if (!ctx.replicationStateService) {
+      const settingsFile = 'schema-validation-settings.json';
+      if (!existsSync(settingsFile)) {
+        const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+        const sourcePaths = [join(packageRoot, settingsFile), join(packageRoot, 'src', 'legacy', settingsFile)];
+        const sourcePath = sourcePaths.find(p => existsSync(p));
+        if (sourcePath) {
+          await copyFile(sourcePath, settingsFile);
+        }
       }
+      // The run owns its record set and its memory ceiling; the replication state is handed it and never builds one.
+      const recordKeySet = createRecordKeySet(config.recordDeduplicationMaxBytes);
+      return { context: { ...ctx, replicationStateService: createReplicationStateServiceInstance({ recordKeySet }) } };
     }
-    return { context: { ...ctx, replicationStateService: createReplicationStateServiceInstance() } };
-  }
-  return { context: ctx };
-};
+    return { context: ctx };
+  };
 
 /**
  * Format replication progress as structured JSON for the UI bar chart.
@@ -690,7 +695,7 @@ export const replicateAndValidate = (config: DDConfig): PipelineStep<DDContext> 
   // in parallel if enabled. Default is sequential to avoid overloading servers.
   mode: 'sequential',
   functions: [
-    initReplicationState,
+    initReplicationState(config),
     ...(config.parallelReplicate
       ? [
           async (ctx: Readonly<DDContext>, onProgress: import('./types.js').ProgressCallback) => {

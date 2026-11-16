@@ -387,7 +387,7 @@ const scorePayload = ({
 }) => {
   
   if (!REPLICATION_STATE_SERVICE) throw new Error('Replication state service instance is null or undefined!');
-  const { hashExists, addOrIncrementHashValue, getResourceAvailabilityMap, getMetadataMap } = REPLICATION_STATE_SERVICE;
+  const { addRecordKey, getResourceAvailabilityMap, getMetadataMap } = REPLICATION_STATE_SERVICE;
 
   const records = extractValues(jsonData);
 
@@ -406,9 +406,13 @@ const scorePayload = ({
 
       // duplicate detection - necessary for both parent resources and their expansions as we can
       // resample both resources and their expansions in testing using different replication strategies
+      //
+      // One add, and its outcome decides: 'added' is a record this run has not counted, so it is counted.
+      // 'present' is one it has, so it is skipped. 'refused' means the set reached its ceiling and can no longer
+      // tell the two apart, so the record is skipped as well: the totals come out low, never high, and the set
+      // remembers the refusal so the report can say the totals are a floor.
       const normalizedRecordHash = hashJsonData({ modelName, parentModelName, normalizedRecord });
-      if (!hashExists(normalizedRecordHash)) {
-        addOrIncrementHashValue(normalizedRecordHash);
+      if (addRecordKey(String(normalizedRecordHash)) === 'added') {
 
         ensureModelAvailabilityMapIsInitialized({
           resourceAvailabilityMap: getResourceAvailabilityMap(),
@@ -496,8 +500,6 @@ const scorePayload = ({
         }
 
         availabilityMap.numUniqueRecordsFetched++;
-      } else {
-        addOrIncrementHashValue(normalizedRecordHash);
       }
 
       if (isExpansion) {
@@ -911,6 +913,39 @@ const removeSchemaValidationWarningsReport = async ({ outputPath }) => {
 };
 
 /**
+ * What the availability report says about record deduplication. The ONE place that decides it: to change when the
+ * field appears (always, or only when saturated), change this function and nothing else.
+ *
+ * The report is uploaded and a provider reads it, so it carries the two facts a reader needs and nothing about how
+ * the set works (no sizes, widths or capacities; those go to the log, see describeRecordDeduplication):
+ *   - `saturated`: the set reached its memory ceiling during the run.
+ *   - `totalsAreFloor`: at least one record was skipped because the set could no longer tell it from a counted
+ *     one, so every availability total in the report is a lower bound.
+ *
+ * @param {Object} replicationStateService the run's replication state
+ * @returns the fields to spread into the availability report
+ */
+const recordDeduplicationReportOf = replicationStateService => {
+  const { saturated = false, refused = 0 } = replicationStateService.getRecordDeduplicationStats() ?? {};
+  return { recordDeduplication: { saturated: !!saturated, totalsAreFloor: refused > 0 } };
+};
+
+/**
+ * One line with everything the record set knows about itself, for the log at the end of a replication call.
+ * @param {Object} replicationStateService the run's replication state
+ * @returns the line
+ */
+const describeRecordDeduplication = replicationStateService => {
+  const { recorded, capacity, loadFactor, bytesReserved, hashBits, saturated, refused } = replicationStateService.getRecordDeduplicationStats() ?? {};
+  const count = n => Number(n ?? 0).toLocaleString('en-US');
+  return (
+    `Record deduplication: ${count(recorded)} distinct records recorded, room for ${count(capacity)} ` +
+    `(${(Number(loadFactor ?? 0) * 100).toFixed(1)}% used), ${count(bytesReserved)} bytes reserved, ${hashBits}-bit hash, ` +
+    `saturated: ${!!saturated}, refused: ${count(refused)}${refused > 0 ? ' (availability totals are a floor)' : ''}`
+  );
+};
+
+/**
  * Writes a data-availability-report.json file for the given version and availability data
  *
  * @param {Object} params
@@ -1022,6 +1057,7 @@ const writeAnalyticsReports = async ({ outputPath, version, softwareVersion, ser
         version,
         ...(softwareVersion ? { softwareVersion } : {}),
         generatedOn,
+        ...recordDeduplicationReportOf(REPLICATION_STATE_SERVICE),
         ...consolidateResults({
           resourceAvailabilityMap: REPLICATION_STATE_SERVICE.getResourceAvailabilityMap(),
           responses: REPLICATION_STATE_SERVICE.getResponses(),
@@ -1514,13 +1550,6 @@ const fetchTopLevelResourceCount = async ({ resourceName, serviceRootUri, filter
   return 0;
 };
 
-/**
- * Generates a random integer.
- * @param {number} max default is 0-9. Pass larger max to sample from more.
- * @returns A random integer between 0 and max.
- */
-const getRandomInt = (max = 9) => Math.floor(Math.random() * max);
-
 /** How many of an error class's failing fields to name before summarizing the rest. Enough to show the
  *  shape of the problem, few enough that one error class stays on one line. */
 const MAX_SCHEMA_FIELDS_LOGGED = 5;
@@ -1613,10 +1642,10 @@ module.exports = {
   DEFAULT_TIMESTAMP_FIELD,
   DEFAULT_PAGE_SIZE,
   computeLastIsoTimestamp,
-  getRandomInt,
   scorePayload,
   writeAnalyticsReports,
   withoutBoundaryRepeats,
+  describeRecordDeduplication,
   removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,

@@ -1,10 +1,10 @@
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { newReplicationState } from '../helpers/replication-state.js';
 
 const require = createRequire(import.meta.url);
 const { getMetadata } = require(resolve(import.meta.dirname, '../../src/etl/common.cjs'));
-const { createReplicationStateServiceInstance } = require(resolve(import.meta.dirname, '../../src/legacy/common.js'));
 const { scorePayload, computeLastIsoTimestamp, REPLICATION_STRATEGIES } = require(
   resolve(import.meta.dirname, '../../src/legacy/lib/replication/utils.js')
 );
@@ -23,7 +23,7 @@ describe('Replication related tests', () => {
       ]
     };
 
-    const replicationInstance = createReplicationStateServiceInstance();
+    const replicationInstance = newReplicationState<{ setMetadataMap: (report: unknown) => void }>();
     replicationInstance.setMetadataMap(metadataReport);
 
     expect(() => {

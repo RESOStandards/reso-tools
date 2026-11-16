@@ -17,6 +17,8 @@ import { resolve } from 'node:path';
 import { CURRENT_DD_VERSION, normalizeDDVersion } from '../sdk/dd-versions.js';
 import type { DDVersion } from '../sdk/dd-versions.js';
 import { SOFTWARE_VERSION } from '../sdk/reports.js';
+import type { DistinctKeySet } from '../state/distinct-key-set.js';
+import { createRecordKeySet } from '../state/record-key-set.js';
 import { normalizeServiceRoot } from '../test-runner/service-root.js';
 
 // @ts-expect-error — legacy CJS
@@ -31,7 +33,7 @@ const { replicate } = certUtils as {
   replicate: (opts: Record<string, unknown>) => Promise<void>;
 };
 const { createReplicationStateServiceInstance } = certUtilsCommon as {
-  createReplicationStateServiceInstance: () => unknown;
+  createReplicationStateServiceInstance: (options: { readonly recordKeySet: DistinctKeySet }) => unknown;
 };
 const { REPLICATION_STRATEGIES } = certUtilsReplicationUtils as {
   REPLICATION_STRATEGIES: Readonly<Record<string, string>>;
@@ -94,6 +96,8 @@ export interface ReplicateOptions {
   readonly originatingSystemId?: string;
   readonly secondsDelayBetweenRequests?: number;
   readonly onProgress?: (info: Record<string, unknown>) => void;
+  /** Ceiling, in bytes, on the memory used to remember which records were counted (default: 1 GiB). */
+  readonly recordDeduplicationMaxBytes?: number;
 }
 
 /**
@@ -116,7 +120,10 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
     );
   }
 
-  const replicationStateService = createReplicationStateServiceInstance();
+  // This run owns its record set and its memory ceiling; the replication state is handed it and never builds one.
+  const replicationStateService = createReplicationStateServiceInstance({
+    recordKeySet: createRecordKeySet(opts.recordDeduplicationMaxBytes)
+  });
   let lastInfo: Record<string, unknown> = {};
 
   await replicate({

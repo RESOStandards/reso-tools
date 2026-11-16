@@ -302,6 +302,13 @@ export interface DDConfig extends BaseComplianceConfig {
   readonly rateLimitWait?: number;
   /** Run replication strategies in parallel (default: false). Enable for faster local testing. */
   readonly parallelReplicate?: boolean;
+  /**
+   * Ceiling, in bytes, on the memory the run may use to remember which records it has counted (default: 1 GiB,
+   * `DEFAULT_RECORD_DEDUPLICATION_MAX_BYTES`). Memory is reserved as it is needed, not up front. A run that reaches
+   * the ceiling keeps going and marks its availability totals as a floor in `data-availability-report.json`. Raise
+   * it for a run that owns its machine; divide a budget between runs that share one.
+   */
+  readonly recordDeduplicationMaxBytes?: number;
   /** Provider Unique Organization Identifier. */
   readonly providerUoi?: string;
   /** Provider Unique System Identifier. */

@@ -19,6 +19,7 @@ const {
   scorePayload,
   writeAnalyticsReports,
   withoutBoundaryRepeats,
+  describeRecordDeduplication,
   removeSchemaValidationWarningsReport,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
@@ -87,6 +88,8 @@ const replicate = async ({
   strictMode = true,
   originatingSystemName,
   originatingSystemId,
+  // No default state: the factory throws without a record set, which only the caller that owns the run can size.
+  // A caller passes the state it created with createReplicationStateServiceInstance({ recordKeySet }).
   REPLICATION_STATE_SERVICE = createReplicationStateServiceInstance(),
   // The software that wrote the reports, stamped into the availability report. The caller passes it; absent, the
   // report carries none rather than a guess.
@@ -456,6 +459,10 @@ const replicate = async ({
         process.exit(NOT_OK);
       }
     }
+
+    // Everything the record set knows about itself, once per call. The report carries only whether its totals
+    // are a floor.
+    LOG(describeRecordDeduplication(REPLICATION_STATE_SERVICE));
 
     if (fromCli) {
       getSystemRuntimeInfo({

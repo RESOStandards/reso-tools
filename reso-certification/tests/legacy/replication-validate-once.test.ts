@@ -18,12 +18,11 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import certUtilsCommon from '../../src/legacy/common.js';
 import certUtils from '../../src/legacy/index.js';
 import replicationUtils from '../../src/legacy/lib/replication/utils.js';
+import { newReplicationState } from '../helpers/replication-state.js';
 import { type ReplicationMockOptions, startReplicationMockServer } from './replication-mock-server.js';
 
-const { createReplicationStateServiceInstance } = certUtilsCommon as { createReplicationStateServiceInstance: () => unknown };
 const { replicate } = certUtils as { replicate: (options: Record<string, unknown>) => Promise<void> };
 interface BoundaryWindow {
   readonly lastIsoTimestamp?: string | null;
@@ -110,7 +109,7 @@ const errorsReportOf = async (
     strictMode: false,
     throwOnError: true,
     secondsDelayBetweenRequests: 0,
-    REPLICATION_STATE_SERVICE: createReplicationStateServiceInstance(),
+    REPLICATION_STATE_SERVICE: newReplicationState(),
     ...options
   });
   return JSON.parse(await readFile(join(outputPath, ERRORS_FILE), 'utf-8'));

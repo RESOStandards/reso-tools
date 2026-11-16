@@ -14,14 +14,13 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import certUtilsCommon from '../../src/legacy/common.js';
 import certUtils from '../../src/legacy/index.js';
 import schemaResults from '../../src/legacy/lib/replication/schema-results.js';
 import { replicateAndValidate } from '../../src/sdk/dd.js';
 import type { DDConfig } from '../../src/sdk/types.js';
+import { newReplicationState } from '../helpers/replication-state.js';
 import { type ReplicationMockOptions, startReplicationMockServer } from './replication-mock-server.js';
 
-const { createReplicationStateServiceInstance } = certUtilsCommon as { createReplicationStateServiceInstance: () => unknown };
 const { replicate } = certUtils as { replicate: (options: Record<string, unknown>) => Promise<void> };
 const { mergeSchemaValidationResults } = schemaResults as {
   mergeSchemaValidationResults: (accumulated: unknown, results: unknown) => Record<string, unknown>;
@@ -208,7 +207,7 @@ describe('a relaxed Data Dictionary run reports the schema findings of every str
   it('counts an entry at the largest count one strategy gave it, never the sum across strategies', async () => {
     const second = { ListingKey: 'NEW2', ModificationTimestamp: RECENT, BedroomsTotal: 'four' };
     const base = await setUp({ records: [OLD1, second] });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     // Two walks over both records, then one over the recent record alone.
     await replicateWith(base, state, { strategy: 'TopAndSkip', strictMode: false });
@@ -234,7 +233,7 @@ describe('a relaxed Data Dictionary run reports the schema findings of every str
       // one finding on the page with the old record, a different one on a page without it
       pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
     });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     await replicateWith(base, state, { strategy: 'TopAndSkip', strictMode: false });
     await replicateWith(base, state, { strategy: 'NextLink', strictMode: false, filter: RECENT_ONLY });
@@ -254,7 +253,7 @@ describe('a relaxed Data Dictionary run reports the schema findings of every str
       records: [{ ListingKey: 'OLD1', ModificationTimestamp: OLD }, NEW1],
       pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
     });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     // The old record alone: a warning, no error, so this strategy writes the warnings file.
     await replicateWith(base, state, {
@@ -278,10 +277,10 @@ describe('a relaxed Data Dictionary run reports the schema findings of every str
 
   it('starts from nothing in another run: the findings belong to the run’s own state', async () => {
     const first = await setUp({ records: [OLD1] });
-    await replicateWith(first, createReplicationStateServiceInstance(), { strategy: 'TopAndSkip', strictMode: false });
+    await replicateWith(first, newReplicationState(), { strategy: 'TopAndSkip', strictMode: false });
 
     const secondRun = await setUp({ records: [NEW1] });
-    await replicateWith(secondRun, createReplicationStateServiceInstance(), { strategy: 'TopAndSkip', strictMode: false });
+    await replicateWith(secondRun, newReplicationState(), { strategy: 'TopAndSkip', strictMode: false });
 
     const report = await readReport(secondRun.outputPath, ERRORS_FILE);
     expect(messagesMatching(report.errors, /^MUST be integer/)).toHaveLength(0);
@@ -355,7 +354,7 @@ describe('merging the schema results of two strategies', () => {
 describe('a strict run fails fast and otherwise accumulates', () => {
   it('stops at the first page with an error and reports that call alone, on a state that already ran a strategy', async () => {
     const base = await setUp({ records: [OLD1, NEW1] });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     // The filtered walk reaches NEW1 only, and fails on it.
     await expect(replicateWith(base, state, { strategy: 'NextLink', strictMode: true, filter: RECENT_ONLY })).rejects.toThrow(
@@ -384,7 +383,7 @@ describe('a strict run fails fast and otherwise accumulates', () => {
       ],
       pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
     });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     await replicateWith(base, state, { strategy: 'TopAndSkip', strictMode: true });
     await replicateWith(base, state, { strategy: 'NextLink', strictMode: true });
@@ -405,7 +404,7 @@ describe('a strict run fails fast and otherwise accumulates', () => {
       records: [{ ListingKey: 'OLD1', ModificationTimestamp: OLD }, NEW1],
       pageContext: page => (page.some(record => record.ListingKey === 'OLD1') ? 'urn:reso:metadata:2.0:resource:member' : 'not-a-context')
     });
-    const state = createReplicationStateServiceInstance();
+    const state = newReplicationState();
 
     // The old record alone: a warning, no error.
     await replicateWith(base, state, {

@@ -522,10 +522,15 @@ const parseBooleanValue = item => {
   return false;
 };
 
-/** New replication state for one run, initialized. Never shared with another run. */
-const createReplicationStateServiceInstance = () => {
+/**
+ * New replication state for one run, initialized. Never shared with another run.
+ *
+ * `recordKeySet` is required: the set that deduplicates the run's records, created by the caller that owns the run.
+ * Called without one, this throws.
+ */
+const createReplicationStateServiceInstance = ({ recordKeySet } = {}) => {
   const { createReplicationState } = require('./lib/replication/services/state');
-  const replicationStateService = createReplicationState();
+  const replicationStateService = createReplicationState({ recordKeySet });
   replicationStateService.init();
   return replicationStateService;
 };
