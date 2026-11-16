@@ -90,7 +90,11 @@ interface StepRun {
 }
 
 /** Run the step alone through the pipeline, as a Data Dictionary run does, against a mock server. */
-const runStep = async (server: ReadonlyArray<ReplicationMockOptions>, overrides: Partial<DDConfig> = {}): Promise<StepRun> => {
+const runStep = async (
+  server: ReadonlyArray<ReplicationMockOptions>,
+  overrides: Partial<DDConfig> = {},
+  contextVersion?: string
+): Promise<StepRun> => {
   const mock = await startMultiResourceReplicationMockServer(server);
   const outputPath = await mkdtemp(join(tmpdir(), 'dd-replication-step-'));
   cleanups.push(mock.close, () => rm(outputPath, { recursive: true, force: true }));
@@ -109,7 +113,13 @@ const runStep = async (server: ReadonlyArray<ReplicationMockOptions>, overrides:
   const step = replicateAndValidate(config);
   type Ctx = Parameters<NonNullable<typeof step.functions>[number]>[0];
   const result = await createPipeline('dd', [step], everyStepPassed).run(
-    { serverUrl: mock.url, version: config.version, outputPath, metadataReportPath, authToken: '<sentinel_token>' } as unknown as Ctx,
+    {
+      serverUrl: mock.url,
+      version: contextVersion ?? config.version,
+      outputPath,
+      metadataReportPath,
+      authToken: '<sentinel_token>'
+    } as unknown as Ctx,
     event => events.push(event)
   );
   expect(result.steps).toHaveLength(1);
@@ -165,6 +175,14 @@ describe('the Replicate and validate step', () => {
     expect(step.status).toBe('passed');
     expect(step.summary).toBe('Timestamp Descending with $top=100; 8 records received');
     expect(step.counts).toEqual({ recordsTested: 8 });
+    expect(strategiesInProgress(events)).toEqual(['Timestamp Descending']);
+  });
+
+  // Which strategies run has always followed the configured version, and the page size the run's own. A Data
+  // Dictionary run sets both from one value; this holds the two apart to show each is read where it was.
+  it('takes the strategies from the configured version and the page size from the run’s', async () => {
+    const { step, events } = await runStep(cleanServer, { version: '1.7' } as Partial<DDConfig>, '2.0');
+    expect(step.summary).toBe('Timestamp Descending with $top=1000; 8 records received');
     expect(strategiesInProgress(events)).toEqual(['Timestamp Descending']);
   });
 

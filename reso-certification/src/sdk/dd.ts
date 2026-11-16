@@ -726,8 +726,11 @@ interface DDReplicationJob {
  *
  * The lookback's cutoff is worked out here, when the step starts, not when its job does. It is a year boundary, so
  * the two differ only for a run in progress as the year changes.
+ *
+ * Two versions are read, as before: the page size follows the run's version (the context's), and which strategies
+ * run follows the configured one. A Data Dictionary run sets both from the same value.
  */
-const ddReplicationJobs = (version: DDVersion): ReadonlyArray<DDReplicationJob> => {
+const ddReplicationJobs = (version: DDVersion, configuredVersion: DDVersion): ReadonlyArray<DDReplicationJob> => {
   const pageSize = version === '1.7' ? DEFAULT_PAGE_SIZE_V17 : DEFAULT_PAGE_SIZE_V20;
   const cutoffDate = new Date(new Date().getFullYear() - DEFAULT_YEARS_BACK, 0).toISOString();
   return [
@@ -737,7 +740,7 @@ const ddReplicationJobs = (version: DDVersion): ReadonlyArray<DDReplicationJob> 
       label: 'Timestamp Descending',
       summary: `Timestamp Descending with $top=${pageSize}`
     },
-    ...(version !== '1.7'
+    ...(configuredVersion !== '1.7'
       ? [
           {
             strategy: REPLICATION_STRATEGIES.NEXT_LINK,
@@ -777,7 +780,7 @@ const stoppedJobIndexOf = (err: unknown): number | undefined => {
 const replicateAllStrategies =
   (config: DDConfig): TestFunction<DDContext> =>
   async (ctx, onProgress) => {
-    const jobs = ddReplicationJobs(ctx.version);
+    const jobs = ddReplicationJobs(ctx.version, config.version);
     const summaries = jobs.map(job => job.summary);
     try {
       await replicateJobs({
