@@ -2,6 +2,7 @@
 
 const { buildMetadataMap } = require('../../../common');
 const { getRandomInt } = require('../utils');
+const { mergeSchemaValidationResults } = require('../schema-results');
 
 // Node has a 2^24 record limit on hashmaps, so the default supports around 336m hashes
 const NUM_RECORD_COUNT_HASHMAPS = 20;
@@ -70,6 +71,12 @@ const createReplicationState = () => {
    * Metadata map used for lookups on a given metadata report
    */
   let _metadataMap = {};
+
+  /**
+   * The schema validation results of every strategy of this run that accumulated them (relaxed mode), merged.
+   * Null until the first one does.
+   */
+  let _schemaValidationResults = null;
 
   /**
    * Local state variable to track whether the service is initialized
@@ -208,6 +215,23 @@ const createReplicationState = () => {
     _metadataMap = metadataMap;
   };
 
+  /**
+   * Accessor for the schema validation results accumulated across this run's strategies
+   * @returns the merged results, or null when no strategy has accumulated any
+   */
+  const getSchemaValidationResults = () => _schemaValidationResults;
+
+  /**
+   * Merges one strategy's schema validation results into this run's. See `../schema-results` for the counting
+   * rule: the findings are the union, and a count is never the sum across strategies.
+   * @param {Object} results one `replicate()` call's results, as returned by the schema validator
+   * @returns the run's merged results
+   */
+  const accumulateSchemaValidationResults = results => {
+    _schemaValidationResults = mergeSchemaValidationResults(_schemaValidationResults, results);
+    return _schemaValidationResults;
+  };
+
   return {
     init,
     getIsInitialized,
@@ -219,6 +243,8 @@ const createReplicationState = () => {
     incrementResourcePageCount,
     getMetadataMap,
     setMetadataMap,
+    getSchemaValidationResults,
+    accumulateSchemaValidationResults,
     getTopLevelResourceCounts,
     setTopLevelResourceCount,
     checkIfTopLevelResourceCountExists

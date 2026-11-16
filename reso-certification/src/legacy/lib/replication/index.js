@@ -403,6 +403,15 @@ const replicate = async ({
       }
     }
 
+    // Relaxed mode reports the findings of every strategy of the run, so this call's are merged into the run's
+    // state and the reports below are written from the merged results. Each strategy is a separate call with a map
+    // of its own, and writing from that map left the report describing the last strategy alone. The merge never
+    // sums a count across strategies (see ./schema-results). Strict mode stops at the first page with an error,
+    // above, and otherwise reports this call's own results, as it always has.
+    if (jsonSchemaValidation && !strictMode) {
+      schemaValidationResults = REPLICATION_STATE_SERVICE.accumulateSchemaValidationResults(schemaValidationResults);
+    }
+
     if (shouldGenerateReports) {
       try {
         // Each report is written on its own terms rather than as an either/or. These were once
