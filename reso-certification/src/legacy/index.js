@@ -8,7 +8,7 @@ const { restore } = require('./lib/restore');
 const { runDDTests, DEFAULT_LIMIT } = require('./lib/certification/data-dictionary');
 const { runUpiTests, parseUpi } = require('./lib/certification/upi');
 const { findVariations, updateVariations, computeVariations, DEFAULT_FUZZINESS, inflateVariations } = require('./lib/variations');
-const { replicate } = require('./lib/replication');
+const { replicate, replicateJobs } = require('./lib/replication');
 const { convertMetadata, convertAndSaveMetadata } = require('./lib/metadata');
 const { DEFAULT_DD_VERSION, DEFAULT_UPI_VERSION, parseBooleanValue } = require('./common');
 const { DEFAULT_PAGE_SIZE } = require('./lib/replication/utils');
@@ -182,6 +182,7 @@ module.exports = {
   VALIDATION_ERROR_MESSAGES,
   DEFAULT_DD_VERSION,
   replicate,
+  replicateJobs,
   restore,
   runDDTests,
   runUpiTests,
