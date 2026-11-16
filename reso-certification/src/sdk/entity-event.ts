@@ -4,6 +4,7 @@ import { runAllEntityEventScenarios } from '../entity-event/test-runner.js';
 import type { EntityEventConfig as EERunnerConfig } from '../entity-event/types.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadata, loadMetadataFromFile, parseMetadataXml, persistMetadataXml } from '../test-runner/metadata.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import { CERTIFIABLE, RECORDS_TESTED, allOf, everyStepPassed, notCertifiable, testedAtLeastOneRecord } from './certification.js';
 import { collectValidationErrors, formatValidationSummary, validateMetadata } from './metadata-validation.js';
 import { createPipeline } from './pipeline.js';
@@ -294,7 +295,7 @@ export const runEntityEventCompliance = async (
   const pipeline = createEntityEventPipeline(config);
   const outputPath = await prepareOutputDir('entity-event', '1.0.0', config);
   const initialContext: EntityEventContext = {
-    serverUrl: config.server.url,
+    serverUrl: normalizeServiceRoot(config.server.url),
     mode: config.mode ?? 'observe',
     writableResource: config.writableResource ?? 'Property',
     outputPath

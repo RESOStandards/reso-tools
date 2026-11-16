@@ -23,6 +23,7 @@ import {
   validateStatusCode,
   validateStatusCodeRange
 } from '../test-runner/index.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import type {
   AddEditCleanup,
   EntityType,
@@ -649,7 +650,7 @@ const runDeleteSucceeds = async (
   const assertions: TestAssertion[] = [];
 
   const deleteUrl = deletePayload.url
-    ? `${config.serverUrl}/${deletePayload.url}`
+    ? `${normalizeServiceRoot(config.serverUrl)}/${deletePayload.url}`
     : buildResourceUrl(config.serverUrl, config.resource, deletePayload.id);
 
   const response = await odataRequest({
@@ -685,7 +686,7 @@ const runDeleteFails = async (config: TestConfig, authToken: string, deletePaylo
   const assertions: TestAssertion[] = [];
 
   const deleteUrl = deletePayload.url
-    ? `${config.serverUrl}/${deletePayload.url}`
+    ? `${normalizeServiceRoot(config.serverUrl)}/${deletePayload.url}`
     : buildResourceUrl(config.serverUrl, config.resource, deletePayload.id);
 
   const response = await odataRequest({

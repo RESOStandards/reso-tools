@@ -4,6 +4,7 @@
  * Builds the correct OData URL for each scenario type from resolved TestParams.
  */
 
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import type { TestParams } from './sampling.js';
 import type {
   CollectionScenario,
@@ -238,7 +239,7 @@ const buildInOperatorUrl = (
 // nothing: select-all still returns SLV / LegacyODataValue WHEN the provider declares them (for the report-only
 // value classification), and can never 400 on their absence.
 export const buildLookupUrl = (serverUrl: string, lookupName: string): string =>
-  `${serverUrl}/Lookup?$filter=${encodeURIComponent(`LookupName eq '${lookupName}'`)}`;
+  `${normalizeServiceRoot(serverUrl)}/Lookup?$filter=${encodeURIComponent(`LookupName eq '${lookupName}'`)}`;
 
 const buildExpandUrl = (serverUrl: string, resource: string, params: TestParams, scenario: ExpandScenario): QuerySpec | undefined => {
   const expandField = resolveField(params, scenario.fieldParam);
@@ -428,4 +429,5 @@ export const buildScenarioQuery = (
   resource: string,
   scenario: CoreScenario,
   params: TestParams
-): QuerySpec | undefined => scopeToOriginatingSystem(buildQueryForCategory(serverUrl, resource, scenario, params), scenario, params);
+): QuerySpec | undefined =>
+  scopeToOriginatingSystem(buildQueryForCategory(normalizeServiceRoot(serverUrl), resource, scenario, params), scenario, params);

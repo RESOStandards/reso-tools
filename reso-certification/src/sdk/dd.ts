@@ -16,6 +16,7 @@ import type { DdReference } from '../metadata/dd-metadata-checks.js';
 import { fetchAndMergeLookupResource } from '../metadata/lookup-resource.js';
 import { resolveAuthToken } from '../test-runner/auth.js';
 import { fetchMetadataWithVersion, persistMetadataXml } from '../test-runner/metadata.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import { computeVariationsViaService } from '../variations/index.js';
 import {
   CERTIFIABLE,
@@ -170,7 +171,8 @@ export const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => 
     const metadataXmlPath = await persistMetadataXml(ctx.outputPath, edmxXml);
 
     // Fetch Lookup Resource and merge if available
-    const lookupUrl = `${ctx.serverUrl}/Lookup`;
+    const serviceRoot = normalizeServiceRoot(ctx.serverUrl);
+    const lookupUrl = `${serviceRoot}/Lookup`;
     onProgress({ step: 'sub:metadata', status: 'running', message: 'Fetching Lookup Resource...' });
     const { report, lookupResourceAvailable, lookupRecordCount, rawRecords } = await fetchAndMergeLookupResource(
       baseReport,
@@ -228,7 +230,7 @@ export const generateMetadata = (_config: DDConfig): PipelineStep<DDContext> => 
       artifacts,
       requestDetails: [
         // Match what the wrapper actually fetches (useFormatParam: true).
-        { method: 'GET', url: `${ctx.serverUrl}/$metadata?$format=application/xml` },
+        { method: 'GET', url: `${serviceRoot}/$metadata?$format=application/xml` },
         ...(lookupResourceAvailable ? [{ method: 'GET', url: lookupUrl }] : [])
       ],
       ...(validationErrors.length > 0 ? { errors: validationErrors } : {}),
@@ -424,7 +426,7 @@ export const runVariations = (config: DDConfig): PipelineStep<DDContext> => ({
 /** Build common replication settings from pipeline context. */
 const buildReplicationSettings = (ctx: DDContext, config: DDConfig) => ({
   bearerToken: ctx.authToken,
-  serviceRootUri: ctx.serverUrl,
+  serviceRootUri: normalizeServiceRoot(ctx.serverUrl),
   shouldGenerateReports: true,
   version: ctx.version,
   // Strict by default. A certification run that does not enforce what it validates reports a pass
@@ -852,7 +854,7 @@ export const runDDCompliance = async (config: DDConfig, onProgress?: (progress: 
 
   const pipeline = createDDPipeline(config);
   const initialContext: DDContext = {
-    serverUrl: config.server.url,
+    serverUrl: normalizeServiceRoot(config.server.url),
     version: config.version,
     outputPath
   };

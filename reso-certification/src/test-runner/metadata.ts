@@ -6,6 +6,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fetchRawMetadata, fetchRawMetadataWithVersion, parseCsdlXml } from '@reso-standards/reso-metadata-utils';
+import { normalizeServiceRoot } from './service-root.js';
 
 // MetadataFetchError now lives in @reso-standards/reso-metadata-utils (reso-tools #221, Stage 3);
 // cert callers import it from there directly — no pass-through re-export here.
@@ -100,7 +101,7 @@ export const toResoFields = (entityType: EntityType): ReadonlyArray<ResoField> =
  * Returns the raw XML string.
  */
 export const fetchMetadata = async (serverUrl: string, authToken: string, useFormatParam = true): Promise<string> =>
-  fetchRawMetadata(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
+  fetchRawMetadata(normalizeServiceRoot(serverUrl), authToken, { useFormatParam });
 
 /** Fetches metadata and detects the server's OData version. */
 export const fetchMetadataWithVersion = async (
@@ -108,7 +109,7 @@ export const fetchMetadataWithVersion = async (
   authToken: string,
   useFormatParam = true
 ): Promise<{ xml: string; odataVersion: string | undefined }> =>
-  fetchRawMetadataWithVersion(serverUrl.replace(/\/$/, ''), authToken, { useFormatParam });
+  fetchRawMetadataWithVersion(normalizeServiceRoot(serverUrl), authToken, { useFormatParam });
 
 /** Reads OData XML metadata from a local file. */
 export const loadMetadataFromFile = async (filePath: string): Promise<string> => readFile(filePath, 'utf-8');

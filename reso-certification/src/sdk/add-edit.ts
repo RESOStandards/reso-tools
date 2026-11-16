@@ -15,6 +15,7 @@ import {
   resolveAuthToken
 } from '../test-runner/index.js';
 import { persistMetadataXml } from '../test-runner/metadata.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import type { ScenarioResult } from '../test-runner/types.js';
 import { CURRENT_ADD_EDIT_VERSION, whyAddEditVersionDoesNotCertify } from './add-edit-versions.js';
 import { RECORDS_TESTED, allOf, everyStepPassed, testedAtLeastOneRecord, versionCertifies } from './certification.js';
@@ -420,7 +421,7 @@ export const runAddEditCompliance = async (config: AddEditConfig, onProgress?: (
   const specVersion = config.specVersion ?? CURRENT_ADD_EDIT_VERSION;
   const outputPath = await prepareOutputDir('web-api-add-edit', specVersion, config);
   const initialContext: AddEditContext = {
-    serverUrl: config.server.url,
+    serverUrl: normalizeServiceRoot(config.server.url),
     resource: config.resource,
     specVersion,
     outputPath

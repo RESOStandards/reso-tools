@@ -47,4 +47,27 @@ describe('the Data Dictionary metadata step', () => {
     expect(written.softwareVersion).toBe(SOFTWARE_VERSION);
     expect(written.fields.length).toBeGreaterThan(0);
   });
+
+  // The step reports the requests it made. Built on a root with a trailing slash, they read `//$metadata` and
+  // `//Lookup`, which is not what was requested (the fetchers drop the slash) and not a path the server serves.
+  it('reports its requests on the service root, not on the root and a slash', async () => {
+    const edmx = await readFile(new URL('../fixtures/commander/good-edmx.xml', import.meta.url), 'utf-8');
+    vi.mocked(fetchMetadataWithVersion).mockResolvedValue({ xml: edmx, odataVersion: '4.01' });
+    vi.mocked(fetchAndMergeLookupResource).mockImplementation(async report => ({
+      report,
+      lookupResourceAvailable: true,
+      lookupRecordCount: 0,
+      rawRecords: undefined
+    }));
+    const outputPath = await mkdtemp(join(tmpdir(), 'dd-metadata-step-'));
+    cleanups.push(() => rm(outputPath, { recursive: true, force: true }));
+
+    const ctx = { serverUrl: 'https://server.example.org/', authToken: 'tok', version: '2.0', outputPath } as unknown as DDContext;
+    const output = await generateMetadata({} as unknown as DDConfig).run?.(ctx, () => {});
+
+    expect(output?.requestDetails?.map(request => request.url)).toEqual([
+      'https://server.example.org/$metadata?$format=application/xml',
+      'https://server.example.org/Lookup'
+    ]);
+  });
 });

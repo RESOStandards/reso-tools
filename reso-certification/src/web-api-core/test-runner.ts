@@ -9,6 +9,7 @@ import { type EnumRepresentation, isDeadlineError } from '@reso-standards/reso-c
 import { MetadataFetchError, decodeFlagsValue } from '@reso-standards/reso-metadata-utils';
 import { type ODataRequester, type odataRequest, webRequester } from '../test-runner/index.js';
 import { fetchMetadataWithVersion } from '../test-runner/metadata.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 import {
   type AssertionResult,
   assertCollectionLambda,
@@ -740,7 +741,7 @@ const runOneExpandNav = async (
       // Format §4.5.5). The same tolerance is applied to the nav-path leg below; without it, an empty-first-page
       // server would false-fail the has-records dual.
       const expandHasRecords = expandItemCount > 0 || chosenParent[`${nav.name}@odata.nextLink`] != null;
-      const navPathUrl = `${serverUrl}/${resource}('${encodeURIComponent(String(parentKey))}')/${nav.name}`;
+      const navPathUrl = `${normalizeServiceRoot(serverUrl)}/${resource}('${encodeURIComponent(String(parentKey))}')/${nav.name}`;
       const navResp = await requester.request({ method: 'GET', url: navPathUrl, authToken });
       const navStatus = assertODataResponse(navResp, 200);
       if (navResp.status < 200 || navResp.status >= 300) {
@@ -2023,7 +2024,7 @@ export const runPagingScenario = async (
 ): Promise<ScenarioResult> => {
   const assertions: AssertionResult[] = [];
   // The report surfaces whichever request FAILED: a `$top=1` failure must show the `$top=1` GET, not the walk.
-  const topOneUrl = `${serverUrl}/${resource}?$top=1&$select=${params.keyField}`; // the normative $top=1 check
+  const topOneUrl = `${normalizeServiceRoot(serverUrl)}/${resource}?$top=1&$select=${params.keyField}`; // the normative $top=1 check
 
   // A `$top=1` request MUST NOT return an `@odata.nextLink`: the single requested record is the complete
   // response to THAT request, so a continuation would return records beyond `$top=1` (web-api-core.md:84;
@@ -2065,7 +2066,7 @@ export const runPagingScenario = async (
   const osnClause = originatingSystemFilterClause(params.originatingSystemName, params.originatingSystemId);
   const walkFilter = osnClause ? `(${tsField} gt ${gtTarget}) and ${osnClause}` : `${tsField} gt ${gtTarget}`;
   const walkUrl = canWalk
-    ? `${serverUrl}/${resource}?$filter=${encodeURIComponent(walkFilter)}&$orderby=${tsField}&$select=${params.keyField},${tsField}&$top=${walkBound}`
+    ? `${normalizeServiceRoot(serverUrl)}/${resource}?$filter=${encodeURIComponent(walkFilter)}&$orderby=${tsField}&$select=${params.keyField},${tsField}&$top=${walkBound}`
     : undefined;
 
   if (!walkUrl) {
@@ -2189,7 +2190,7 @@ const runServiceDocumentProbe = async (
   start: number,
   requester: ODataRequester
 ): Promise<{ readonly result: ScenarioResult; readonly served: ReadonlySet<string> | undefined }> => {
-  const url = serverUrl;
+  const url = normalizeServiceRoot(serverUrl);
   const assertions: AssertionResult[] = [];
   try {
     const response = await requester.request({ method: 'GET', url, authToken });
@@ -2256,7 +2257,7 @@ export const runProviderScenarios = async (
         serverUrl,
         '',
         'metadata',
-        { url: `${serverUrl}/$metadata`, selectFields: [] },
+        { url: `${normalizeServiceRoot(serverUrl)}/$metadata`, selectFields: [] },
         providerParamsStub,
         authToken,
         start,

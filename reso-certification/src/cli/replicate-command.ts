@@ -17,6 +17,7 @@ import { resolve } from 'node:path';
 import { CURRENT_DD_VERSION, normalizeDDVersion } from '../sdk/dd-versions.js';
 import type { DDVersion } from '../sdk/dd-versions.js';
 import { SOFTWARE_VERSION } from '../sdk/reports.js';
+import { normalizeServiceRoot } from '../test-runner/service-root.js';
 
 // @ts-expect-error — legacy CJS
 import certUtilsCommon from '../legacy/common.js';
@@ -119,7 +120,7 @@ export const runReplicate = async (opts: ReplicateOptions): Promise<ReplicateRes
   let lastInfo: Record<string, unknown> = {};
 
   await replicate({
-    serviceRootUri: opts.serviceRootUri,
+    serviceRootUri: normalizeServiceRoot(opts.serviceRootUri),
     strategy: opts.strategy,
     bearerToken: opts.bearerToken,
     // Report-driven mode wins (legacy enumerates every resource in the report); otherwise single-resource params.

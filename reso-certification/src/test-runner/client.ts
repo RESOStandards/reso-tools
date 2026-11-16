@@ -6,6 +6,7 @@
  */
 
 import { type ResilienceSession, buildUri, createClient } from '@reso-standards/reso-client';
+import { normalizeServiceRoot } from './service-root.js';
 import type { ODataResponse } from './types.js';
 
 /** Options for making an OData HTTP request. */
@@ -62,6 +63,6 @@ export const odataRequest = async (
  * With a key:    `https://api.reso.org/Property('12345')`
  */
 export const buildResourceUrl = (serverUrl: string, resource: string, key?: string): string => {
-  const builder = buildUri(serverUrl.replace(/\/$/, ''), resource);
+  const builder = buildUri(normalizeServiceRoot(serverUrl), resource);
   return key ? builder.key(key).build() : builder.build();
 };
