@@ -62,9 +62,7 @@ const RECENT_ONLY = `ModificationTimestamp ge ${thisYear - 2}-01-01T00:00:00.000
 // metadata does not advertise. NEW1 has one: another unadvertised field.
 const OLD1 = { ListingKey: 'OLD1', ModificationTimestamp: OLD, BedroomsTotal: 'three', OldOnlyField: 'x' };
 const NEW1 = { ListingKey: 'NEW1', ModificationTimestamp: RECENT, NewOnlyField: 'y' };
-// The oldest record of all, with nothing wrong. The timestamp walk fetches the oldest record of each page a second
-// time (its next page starts at that timestamp, inclusive), so this is the record it repeats, and the counts of the
-// records above stay one per strategy. The repeat itself is pinned in its own test below.
+// The oldest record of all, with nothing wrong, so the walks below end on a record that has no findings.
 const OLDEST_CLEAN = { ListingKey: 'OLD0', ModificationTimestamp: `${thisYear - 12}-06-01T00:00:00.000Z` };
 
 interface SchemaReport {
@@ -321,24 +319,6 @@ describe('merging the schema results of two strategies', () => {
     expect(mergeSchemaValidationResults(a, a)).toEqual(a);
     mergeSchemaValidationResults(a, b);
     expect({ a, b }).toEqual(before);
-  });
-});
-
-// Pinned as it is, not endorsed. Within ONE strategy a count is of occurrences, and the timestamp walk has a repeat of
-// its own: each page after the first starts at the last timestamp of the page before, inclusive, so it fetches that
-// boundary record again. Availability drops the repeat by the record hash; schema validation runs on the raw page and
-// counts it twice. The run's report used to come from the last strategy, a NextLink walk with no such repeat, so this
-// did not reach it; a merged count can now carry it. It is the same class as the per-expansion repeat, and it goes
-// when validation sits behind the dedup set (phase 0, #385) or the walk pages by timestamp and key (#254).
-describe('known: the timestamp walk validates its boundary record twice', () => {
-  it('counts one violation on the oldest record twice within the one strategy', async () => {
-    const base = await setUp({ records: [OLD1] });
-    await replicateWith(base, createReplicationStateServiceInstance(), { strategy: 'TimestampDesc', strictMode: false });
-
-    const report = await readReport(base.outputPath, ERRORS_FILE);
-    const [typeError] = messagesMatching(report.errors, /^MUST be integer/);
-    expect(fieldCounts(report, typeError)).toEqual({ BedroomsTotal: 2 });
-    expect(report.errors[typeError].resources[RESOURCE].keys).toEqual(['OLD1']);
   });
 });
 

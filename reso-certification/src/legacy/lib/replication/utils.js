@@ -65,6 +65,52 @@ const hashJsonData = (jsonData, useFullHashes = false) => {
 };
 
 /**
+ * The most record identities one call keeps. A V8 Set holds 2^24 entries and throws past that.
+ */
+const MAX_VALIDATED_RECORD_HASHES = 2 ** 24 - 1;
+
+/**
+ * A page without the records this `replicate()` call has already validated, for schema validation only.
+ *
+ * The timestamp walks fetch each page's boundary record again by design, and a server may repeat a record on its
+ * own. Validating a repeat finds nothing new and counts every violation on it again, and a count must never be
+ * high. So a record is validated once per call.
+ *
+ * A record is the same record when its resource and its whole content as served are the same, expanded data
+ * included. That is NOT the hash the availability guard in `scorePayload` uses: that one takes the expanded data
+ * out of the parent before hashing, so a record fetched alone and then with an expansion has the same parent hash,
+ * and skipping on it would leave the expanded data unvalidated. Here those two are different records and both are
+ * validated. A record whose content changed between two fetches is a different record too.
+ *
+ * The identity is the full SHA-256, not the shortened hash availability uses. A collision there undercounts, which
+ * is allowed. A collision here would skip a record that was never validated, and a missed error is a false pass.
+ * For the same reason every doubt resolves to validating: a record that cannot be hashed is kept, and once the set
+ * is full, records it has not seen are kept without being remembered.
+ *
+ * Everything else on the page is returned as it came, so a finding about the page itself (its `@reso.context`) is
+ * made once per page fetched, as before. `validatedRecordHashes` is added to.
+ *
+ * @param {Object} obj
+ * @param {Object} obj.jsonData the page as the server returned it
+ * @param {String} obj.resourceName the resource the page was requested from
+ * @param {Set<String>} obj.validatedRecordHashes the identities this call has validated so far
+ * @returns the page with only the records not validated yet, or `jsonData` itself when it is not a page of records
+ */
+const withoutValidatedRecords = ({ jsonData, resourceName, validatedRecordHashes }) => {
+  if (!Array.isArray(jsonData?.value)) return jsonData;
+
+  const value = jsonData.value.filter(record => {
+    const hash = hashJsonData({ resourceName, record }, true);
+    if (!hash) return true;
+    if (validatedRecordHashes.has(hash)) return false;
+    if (validatedRecordHashes.size < MAX_VALIDATED_RECORD_HASHES) validatedRecordHashes.add(hash);
+    return true;
+  });
+
+  return { ...jsonData, value };
+};
+
+/**
  * Extracts values from JSON Data
  *
  * @param {Object} jsonData
@@ -1525,6 +1571,7 @@ module.exports = {
   getRandomInt,
   scorePayload,
   writeAnalyticsReports,
+  withoutValidatedRecords,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
   SCHEMA_VALIDATION_WARNINGS_FILENAME,

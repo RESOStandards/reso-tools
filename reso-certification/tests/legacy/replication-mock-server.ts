@@ -25,6 +25,11 @@ export interface ReplicationMockOptions {
    * is given the page's records and decides per page, so a test can make different strategies see different findings.
    */
   readonly pageContext?: string | ((page: ReadonlyArray<Record<string, unknown>>) => string | undefined);
+  /**
+   * Expanded data by navigation property name. A request whose `$expand` names one gets it on every record, so the
+   * same record is served with different content under different request shapes, as a real server does.
+   */
+  readonly expansions?: Readonly<Record<string, unknown>>;
 }
 
 export interface ReplicationMockServer {
@@ -99,7 +104,12 @@ export const startReplicationMockServer = async (opts: ReplicationMockOptions): 
     const ordered = applyOrderby(applyFilter(opts.records, q.$filter, tsField), q.$orderby, tsField);
     const pageSize = toInt(q.$top) ?? parseMaxPageSize(req.get('prefer')) ?? 100;
     const skip = toInt(q.$skip) ?? 0;
-    const page = ordered.slice(skip, skip + pageSize);
+    const expanded = (q.$expand ?? '').split(',').filter(name => name in (opts.expansions ?? {}));
+    const page = ordered
+      .slice(skip, skip + pageSize)
+      .map(record =>
+        expanded.length ? { ...record, ...Object.fromEntries(expanded.map(name => [name, opts.expansions?.[name]])) } : record
+      );
 
     const pageContext = typeof opts.pageContext === 'function' ? opts.pageContext(page) : opts.pageContext;
     const body: Record<string, unknown> = {

@@ -18,6 +18,7 @@ const {
   handleError,
   scorePayload,
   writeAnalyticsReports,
+  withoutValidatedRecords,
   writeSchemaValidationErrorReport,
   writeSchemaValidationWarningsReport,
   getSystemRuntimeInfo,
@@ -126,6 +127,9 @@ const replicate = async ({
     let generatedSchema, validationConfig;
 
     let schemaValidationResults = {};
+
+    // The records this call has validated, so one fetched again is not validated again. See withoutValidatedRecords.
+    const validatedRecordHashes = new Set();
 
 
     if (jsonSchemaValidation) {
@@ -326,7 +330,7 @@ const replicate = async ({
                 schemaValidationResults =
                   validate({
                     version,
-                    jsonPayload: responseJson,
+                    jsonPayload: withoutValidatedRecords({ jsonData: responseJson, resourceName, validatedRecordHashes }),
                     errorMap: schemaValidationResults,
                     jsonSchema: generatedSchema,
                     resourceName,
