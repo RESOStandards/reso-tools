@@ -319,44 +319,30 @@ const normalizeRecords = ({ expansionInfo = [], record, resourceName: parentMode
   if (!record || !parentModelName) return [];
 
   try {
-    const recordsToProcess = [];
-    if (expansionInfo && expansionInfo?.length) {
-      // flatten expansions into main records
-      recordsToProcess.push(
-        ...expansionInfo.reduce((acc, { fieldName, modelName }) => {
-          const { [fieldName]: expandedData, ...remainingData } = record;
-
-          if (expandedData) {
-            const expandedRecords = Array.isArray(expandedData) ? [...expandedData] : [expandedData];
-            expandedRecords.map(expandedRecord => {
-              acc.push({
-                modelName,
-                parentModelName,
-                fieldName,
-                isExpansion: true,
-                record: expandedRecord
-              });
-            });
-          }
-
-          acc.push({
-            modelName: parentModelName,
-            isExpansion: false,
-            record: remainingData
-          });
-
-          return acc;
-        }, [])
-      );
-    } else {
-      recordsToProcess.push({
-        modelName: parentModelName,
-        isExpansion: false,
-        record
-      });
+    if (!expansionInfo?.length) {
+      return [{ modelName: parentModelName, isExpansion: false, record }];
     }
 
-    return recordsToProcess;
+    // The parent is scored once, without any of the navigations the request expanded. A request can expand several
+    // navigations at once (batch expansion): each one's records are scored under its own child, and none of them stays
+    // on the parent as a field. Removing only one navigation per pass scored the parent once per navigation, each time
+    // carrying the others as fields, so a batched run reported ListAgent, Media and the rest as fields of Property and
+    // counted its parent records once per navigation. One navigation per request comes out exactly as before.
+    const navigationNames = new Set(expansionInfo.map(({ fieldName }) => fieldName));
+    const parentRecord = Object.fromEntries(Object.entries(record).filter(([name]) => !navigationNames.has(name)));
+    const expandedRecords = expansionInfo.flatMap(({ fieldName, modelName }) => {
+      const expandedData = record[fieldName];
+      if (!expandedData) return [];
+      return (Array.isArray(expandedData) ? expandedData : [expandedData]).map(expandedRecord => ({
+        modelName,
+        parentModelName,
+        fieldName,
+        isExpansion: true,
+        record: expandedRecord
+      }));
+    });
+
+    return [...expandedRecords, { modelName: parentModelName, isExpansion: false, record: parentRecord }];
   } catch (err) {
     console.error(err);
   }
@@ -396,6 +382,8 @@ const scorePayload = ({
 
   let recordCount = 0,
     expandedRecordCount = 0;
+  // Expanded records by the child they belong to, so a batched request credits each child with its own records.
+  const expandedRecordCounts = {};
 
   // Score records
   records.forEach(record => {
@@ -504,6 +492,7 @@ const scorePayload = ({
 
       if (isExpansion) {
         expandedRecordCount++;
+        expandedRecordCounts[modelName] = (expandedRecordCounts[modelName] ?? 0) + 1;
       } else {
         recordCount++;
       }
@@ -521,6 +510,7 @@ const scorePayload = ({
       resourceName,
       recordCount,
       expandedRecordCount: expansionInfo ? expandedRecordCount : undefined,
+      expandedRecordCounts: expansionInfo ? expandedRecordCounts : undefined,
       expansionInfo,
       strategy,
       hasError: hasError || undefined
@@ -714,9 +704,12 @@ const consolidateResults = ({ resourceAvailabilityMap = {}, responses = [], topL
  */
 const calculateResponseStats = ({ resourceAvailabilityMap = {}, responses = [] }) => {
   const tallies = responses.reduce(
-    (acc, { responseTimeMs, responseBytes, resourceName, recordCount, expandedRecordCount, expansionInfo = [] }) => {
-      const [expandedItem = {}] = expansionInfo,
-        isExpansion = !!(expandedItem && expandedItem?.modelName);
+    (acc, { responseTimeMs, responseBytes, resourceName, recordCount, expandedRecordCount, expandedRecordCounts, expansionInfo = [] }) => {
+      // Every child the request expanded. A batched request expands several: its time and size are the whole
+      // request's, recorded against each child, and each child gets its own expanded records. Filing the request under
+      // its first expansion only left every other child of a batched request with no records, times or sizes.
+      const expandedModelNames = [...new Set((expansionInfo ?? []).map(item => item?.modelName).filter(Boolean))],
+        isExpansion = expandedModelNames.length > 0;
 
       //initialize top-lever resource item if not present
       if (!acc[resourceName]) {
@@ -728,14 +721,12 @@ const calculateResponseStats = ({ resourceAvailabilityMap = {}, responses = [] }
       }
 
       if (isExpansion) {
-        const expandedModelName = expandedItem.modelName;
-
-        if (expandedModelName && !acc[resourceName]?.expansions?.[expandedModelName]) {
-          if (!acc?.[resourceName]?.expansions) {
+        expandedModelNames.forEach(expandedModelName => {
+          if (!acc[resourceName].expansions) {
             acc[resourceName].expansions = {};
           }
 
-          if (!acc?.[resourceName]?.expansions?.[expandedModelName]) {
+          if (!acc[resourceName].expansions[expandedModelName]) {
             acc[resourceName].expansions[expandedModelName] = {
               responseTimes: [],
               responseBytes: [],
@@ -743,12 +734,14 @@ const calculateResponseStats = ({ resourceAvailabilityMap = {}, responses = [] }
               expandedRecordCounts: []
             };
           }
-        }
 
-        acc[resourceName].expansions[expandedModelName].responseTimes.push(responseTimeMs);
-        acc[resourceName].expansions[expandedModelName].responseBytes.push(responseBytes);
-        acc[resourceName].expansions[expandedModelName].recordCounts.push(recordCount);
-        acc[resourceName].expansions[expandedModelName].expandedRecordCounts.push(expandedRecordCount);
+          acc[resourceName].expansions[expandedModelName].responseTimes.push(responseTimeMs);
+          acc[resourceName].expansions[expandedModelName].responseBytes.push(responseBytes);
+          acc[resourceName].expansions[expandedModelName].recordCounts.push(recordCount);
+          acc[resourceName].expansions[expandedModelName].expandedRecordCounts.push(
+            expandedRecordCounts?.[expandedModelName] ?? (expandedModelNames.length === 1 ? expandedRecordCount : 0)
+          );
+        });
       } else {
         acc[resourceName].responseTimes.push(responseTimeMs);
         acc[resourceName].responseBytes.push(responseBytes);
