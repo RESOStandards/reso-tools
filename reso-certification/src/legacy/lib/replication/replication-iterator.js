@@ -8,7 +8,7 @@ const {
   REPLICATION_STRATEGIES,
   processHttpErrorResponse,
   calculateJsonSize,
-  computeLastIsoTimestamp,
+  timestampWalkStep,
   buildRequestUrlString
 } = require('./utils');
 
@@ -145,7 +145,9 @@ async function* replicationIterator({
       /** @type {number} */
       responseStatus = 0,
       /** @type {ReplicationError|null} */
-      error = null;
+      error = null,
+      /** @type {{stuckAt: string, steppedTo: string, recordsRead: number}|null} */
+      timestampWalkGap = null;
 
     requestUri = buildRequestUrlString({
       requestUri,
@@ -193,9 +195,21 @@ async function* replicationIterator({
         try {
           responseJson = await response.json();
 
-          // For timestamp-based strategies, track the last timestamp to use as a filter on the next page
+          // For timestamp-based strategies, track the last timestamp to use as a filter on the next page, and the gap
+          // the walk leaves when a cut-off page made it step past a timestamp.
           if ([REPLICATION_STRATEGIES.TIMESTAMP_ASC, REPLICATION_STRATEGIES.TIMESTAMP_DESC].includes(strategy)) {
-            lastIsoTimestamp = computeLastIsoTimestamp({ jsonData: responseJson, lastIsoTimestamp, strategy, timestampFieldName });
+            // The $top this page asked for. Unreadable, it is 0, so any stuck page counts as cut off: a gap reported
+            // in doubt rather than hidden.
+            const requestedTop = Number.parseInt(new URL(requestUri).searchParams.get('$top') ?? '', 10) || 0;
+            const next = timestampWalkStep({ jsonData: responseJson, lastIsoTimestamp, strategy, timestampFieldName, requestedTop });
+            lastIsoTimestamp = next.lastIsoTimestamp;
+            timestampWalkGap = next.gap;
+            if (timestampWalkGap) {
+              console.log(
+                `A whole page of ${timestampWalkGap.recordsRead} records shares ${timestampWalkGap.stuckAt}. ` +
+                  `Stepped to ${timestampWalkGap.steppedTo}: records between were not read (recorded as a gap).`
+              );
+            }
           }
         } catch {
           // Response was OK but body wasn't valid JSON — treat as empty
@@ -249,7 +263,8 @@ async function* replicationIterator({
       numErrors,
       error,
       hasError: !!error,
-      responseBytes
+      responseBytes,
+      timestampWalkGap
     };
 
     // Throttle between pages if a delay was configured

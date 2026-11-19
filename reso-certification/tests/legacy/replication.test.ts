@@ -37,9 +37,10 @@ describe('Replication related tests', () => {
   });
 });
 
-// The timestamp strategies advance a `ge`/`lt` boundary between pages. When an entire page shares one
-// timestamp the boundary doesn't move, so the collision branch nudges it by 1ms. Regression: the ASC branch
-// used `new Date(dateObj + 1)`, which coerces the Date to a string → Invalid Date → toISOString() throws.
+// The timestamp strategies advance a `ge`/`le` boundary between pages. When an entire page shares one
+// timestamp the boundary doesn't move, so the collision branch steps it by one second (it was one millisecond
+// until 0.14.0; replication-timestamp-step.test.ts covers the step and the gap it records). Regression: the ASC
+// branch used `new Date(dateObj + 1)`, which coerces the Date to a string → Invalid Date → toISOString() throws.
 describe('computeLastIsoTimestamp — timestamp-collision boundary (TimestampAsc/Desc)', () => {
   const TS = '2024-06-15T10:00:00.000Z';
   const collidingPage = { value: [{ ModificationTimestamp: TS }, { ModificationTimestamp: TS }] };
@@ -50,17 +51,17 @@ describe('computeLastIsoTimestamp — timestamp-collision boundary (TimestampAsc
     timestampFieldName: 'ModificationTimestamp'
   });
 
-  it('ASC nudges the boundary forward 1ms on a collision (no Invalid Date throw)', () => {
+  it('ASC steps the boundary forward one second on a collision (no Invalid Date throw)', () => {
     let result: string;
     expect(() => {
       result = computeLastIsoTimestamp(args(REPLICATION_STRATEGIES.TIMESTAMP_ASC, TS));
     }).not.toThrow();
-    expect(new Date(result!).getTime()).toBe(new Date(TS).getTime() + 1);
+    expect(new Date(result!).getTime()).toBe(new Date(TS).getTime() + 1000);
   });
 
-  it('DESC nudges the boundary backward 1ms on a collision', () => {
+  it('DESC steps the boundary backward one second on a collision', () => {
     const result = computeLastIsoTimestamp(args(REPLICATION_STRATEGIES.TIMESTAMP_DESC, TS));
-    expect(new Date(result).getTime()).toBe(new Date(TS).getTime() - 1);
+    expect(new Date(result).getTime()).toBe(new Date(TS).getTime() - 1000);
   });
 
   it('returns the page max/min unchanged when the boundary advances (no collision)', () => {

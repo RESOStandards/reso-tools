@@ -138,34 +138,64 @@ const getTimestampBounds = (jsonData = {}, timestampFieldName) => {
 };
 
 /**
- * Computes the last ISO timestamp with the given data
- * @param {Object} params things needed to compute the timestamp
- * @returns timestamp used to compute the last timestamp
+ * How far a stuck timestamp walk steps past the timestamp it is stuck on: one second.
+ *
+ * A walk is stuck when a whole page shares one timestamp, so the next request would ask for the same page again. A
+ * second is the only step that needs nothing from the server beyond a timestamp comparison Web API Core tests: not how
+ * it orders tied records, pages them or compares keys, nor what precision it declares. It is a whole unit at every
+ * precision a server can serve. The cost is that the step also skips whatever else falls inside that second, which is
+ * why each step past a cut-off page is recorded as a gap (decided 2026-11-18). It was one millisecond, which assumed
+ * millisecond timestamps and left no record of what it skipped.
  */
-const computeLastIsoTimestamp = ({ jsonData = {}, lastIsoTimestamp, strategy, timestampFieldName }) => {
-  // update timestamps if strategy uses timestamps
+const TIMESTAMP_WALK_STEP_MS = 1000;
+
+/**
+ * Where a timestamp walk goes next, and the gap it leaves when it had to step.
+ *
+ * The next page starts at this page's last timestamp (`le` going down, `ge` going up, so the boundary records repeat
+ * and are dropped by hash). When the page is stuck on its starting timestamp, the walk steps one second past it.
+ *
+ * The step is a gap only when the stuck page may have been cut off with more records at that timestamp: it holds as
+ * many records as the `$top` it asked for, or it carries a next link. A shorter page without a next link is the
+ * server saying it returned everything that matched (OData: a server that pages a response short of `$top` says so
+ * with a next link), so stepping past it skips nothing. That is the last page of every walk, which repeats the walk's
+ * final record and so looks stuck, and a whole resource that shares one timestamp and fits on one page.
+ *
+ * @param {Object} params
+ * @param {Object} params.jsonData the page as the server returned it
+ * @param {String|null} params.lastIsoTimestamp the timestamp this page started from
+ * @param {String} params.strategy the walk's replication strategy
+ * @param {String} params.timestampFieldName the field the walk pages on
+ * @param {Number} [params.requestedTop] the `$top` the page asked for
+ * @returns {{lastIsoTimestamp: String|undefined, gap: {stuckAt: String, steppedTo: String, recordsRead: Number}|null}}
+ */
+const timestampWalkStep = ({ jsonData = {}, lastIsoTimestamp, strategy, timestampFieldName, requestedTop = Infinity }) => {
   const { minIsoTimestamp = null, maxIsoTimestamp = null } = getTimestampBounds(jsonData, timestampFieldName) ?? {};
+  const recordsRead = Array.isArray(jsonData?.value) ? jsonData.value.length : 0;
+  const mayBeCutOff = recordsRead >= requestedTop || !!jsonData?.['@odata.nextLink'];
+
+  // getTime() for the arithmetic: `new Date(dateObj + 1)` coerces the Date to a string and yields Invalid Date.
+  const step = (stuckAt, direction) => {
+    const steppedTo = new Date(new Date(stuckAt).getTime() + direction * TIMESTAMP_WALK_STEP_MS).toISOString();
+    return { lastIsoTimestamp: steppedTo, gap: mayBeCutOff ? { stuckAt, steppedTo, recordsRead } : null };
+  };
 
   if (strategy === REPLICATION_STRATEGIES.TIMESTAMP_ASC) {
-    if (lastIsoTimestamp === maxIsoTimestamp) {
-      // Timestamp collision (a whole page shares this timestamp): nudge forward 1ms so the next `ge` page
-      // doesn't re-fetch it. Use getTime() for explicit numeric math — `new Date(dateObj + 1)` coerces the
-      // Date to a string and yields Invalid Date, so .toISOString() throws (the bug this replaced).
-      return new Date(new Date(maxIsoTimestamp).getTime() + 1).toISOString();
-    } else {
-      return maxIsoTimestamp;
-    }
+    return lastIsoTimestamp === maxIsoTimestamp ? step(maxIsoTimestamp, 1) : { lastIsoTimestamp: maxIsoTimestamp, gap: null };
   }
-
   if (strategy === REPLICATION_STRATEGIES.TIMESTAMP_DESC) {
-    if (lastIsoTimestamp === minIsoTimestamp) {
-      // Timestamp collision: nudge backward 1ms (symmetric to ASC; explicit getTime() for the same reason).
-      return new Date(new Date(minIsoTimestamp).getTime() - 1).toISOString();
-    } else {
-      return minIsoTimestamp;
-    }
+    return lastIsoTimestamp === minIsoTimestamp ? step(minIsoTimestamp, -1) : { lastIsoTimestamp: minIsoTimestamp, gap: null };
   }
+  return { lastIsoTimestamp: undefined, gap: null };
 };
+
+/**
+ * The timestamp a timestamp walk's next page starts from. See `timestampWalkStep`, which also says whether the walk
+ * left a gap; the boundary window uses this so it follows the walk exactly.
+ * @param {Object} params things needed to compute the timestamp
+ * @returns {String|undefined} the next page's starting timestamp
+ */
+const computeLastIsoTimestamp = params => timestampWalkStep(params).lastIsoTimestamp;
 
 /**
  * A timestamp walk's page without the records the walk itself fetched twice, for schema validation only.
@@ -197,11 +227,12 @@ const computeLastIsoTimestamp = ({ jsonData = {}, lastIsoTimestamp, strategy, ti
  * A record whose content changed between the two fetches is not identical, so it is validated again: its values may
  * differ, and when in doubt the record is validated.
  *
- * WHEN IT GOES. Paging by (timestamp, key) (#254, phase 4 of the 0.14.0 plan) removes the repeat at its source, and
- * this function goes with it.
+ * WHEN IT GOES. A walk that pages exclusively past each page's last timestamp (#254, in the 0.15.0 replication design;
+ * paging on the key was set aside as untested across providers) removes the repeat at its source, and this function
+ * goes with it.
  *
  * The next request's starting timestamp is worked out with `computeLastIsoTimestamp`, the function the iterator uses,
- * so the window follows the walk: when the walk steps one millisecond past a timestamp (a page that did not move the
+ * so the window follows the walk: when the walk steps one second past a timestamp (a page that did not move the
  * boundary), no record of this page is at the new starting point and nothing is remembered.
  *
  * @param {Object} obj
@@ -369,6 +400,7 @@ const scorePayload = ({
   expansionInfo,
   hasError,
   strategy,
+  timestampWalkGap,
   replicationStateServiceInstance: REPLICATION_STATE_SERVICE
 }) => {
   
@@ -513,6 +545,8 @@ const scorePayload = ({
       expandedRecordCounts: expansionInfo ? expandedRecordCounts : undefined,
       expansionInfo,
       strategy,
+      // Only on the page a stuck timestamp walk stepped past, so every other entry keeps exactly the keys it had.
+      timestampWalkGap: timestampWalkGap ?? undefined,
       hasError: hasError || undefined
     });
   }
@@ -924,6 +958,21 @@ const recordDeduplicationReportOf = replicationStateService => {
 };
 
 /**
+ * Where the run's timestamp walks had to step past a cut-off page, for the availability report: each gap with its
+ * resource, strategy and the request of the page that was cut off (one resource is walked once per request shape, so
+ * the request tells its walks apart), in the order the walks met them. Always present, so an empty list says the
+ * sample has no such gap rather than leaving a reader to guess from a missing field.
+ *
+ * @param {Object} replicationStateService the run's replication state
+ * @returns the field to spread into the availability report
+ */
+const timestampWalkGapsReportOf = replicationStateService => ({
+  timestampWalkGaps: (replicationStateService.getResponses() ?? [])
+    .filter(response => !!response?.timestampWalkGap)
+    .map(({ resourceName, strategy, requestUri, timestampWalkGap }) => ({ resourceName, strategy, requestUri, ...timestampWalkGap }))
+});
+
+/**
  * One line with everything the record set knows about itself, for the log at the end of a replication call.
  * @param {Object} replicationStateService the run's replication state
  * @returns the line
@@ -1051,6 +1100,7 @@ const writeAnalyticsReports = async ({ outputPath, version, softwareVersion, ser
         ...(softwareVersion ? { softwareVersion } : {}),
         generatedOn,
         ...recordDeduplicationReportOf(REPLICATION_STATE_SERVICE),
+        ...timestampWalkGapsReportOf(REPLICATION_STATE_SERVICE),
         ...consolidateResults({
           resourceAvailabilityMap: REPLICATION_STATE_SERVICE.getResourceAvailabilityMap(),
           responses: REPLICATION_STATE_SERVICE.getResponses(),
@@ -1494,8 +1544,8 @@ const buildRequestUrlString = ({
 
     // `le` (inclusive), symmetric to TimestampAsc's `ge`: re-fetch the boundary record and let scorePayload's
     // hash dedup drop the repeat, rather than `lt` (exclusive) which silently dropped every record sharing the
-    // page-boundary timestamp when a collision straddled a page. The -1ms nudge in computeLastIsoTimestamp
-    // breaks the stall when a whole page shares the min timestamp.
+    // page-boundary timestamp when a collision straddled a page. The one-second step in timestampWalkStep
+    // breaks the stall when a whole page shares the min timestamp, and records the gap it leaves.
     return new URL(
       `?$top=${$top}&$filter=${timestampField} le ${timestamp}${preparedFilter?.length ? ` and ${preparedFilter}` : ''}${
         $expand?.length ? `&$expand=${$expand}` : ''
@@ -1634,7 +1684,9 @@ module.exports = {
   DEFAULT_DD_VERSION,
   DEFAULT_TIMESTAMP_FIELD,
   DEFAULT_PAGE_SIZE,
+  TIMESTAMP_WALK_STEP_MS,
   computeLastIsoTimestamp,
+  timestampWalkStep,
   scorePayload,
   writeAnalyticsReports,
   withoutBoundaryRepeats,
