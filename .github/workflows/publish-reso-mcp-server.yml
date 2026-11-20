@@ -1,0 +1,74 @@
+name: Publish reso-mcp-server
+
+# Publishes @reso-standards/reso-mcp-server to npm via npm Trusted Publishing (GitHub OIDC — no token), so it runs
+# with `npx -y @reso-standards/reso-mcp-server`.
+# Trigger: push a tag `reso-mcp-server-v<version>` matching reso-mcp-server/package.json.
+# Deps (published first, from their own workflows): odata-expression-parser, reso-metadata-utils, reso-common,
+# reso-validation, reso-client, reso-certification. This package depends on all of them and nothing depends on it,
+# so it publishes last.
+# The npm entry for this package's trusted publisher names this file. A new entry expires unless a publish uses it
+# within about 48 hours, so set it up when the tag is ready to push.
+# Provenance is generated automatically (public repo + OIDC).
+on:
+  push:
+    tags:
+      - 'reso-mcp-server-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC handshake for npm Trusted Publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Ensure recent npm
+        run: npm install -g npm@11
+
+      - name: Verify tag matches package version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#reso-mcp-server-v}"
+          PKG_VERSION="$(node -p "require('./reso-mcp-server/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) does not match reso-mcp-server/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Install and build (target + deps)
+        run: |
+          npm install \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-metadata-utils \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-client \
+            -w @reso-standards/reso-certification \
+            -w @reso-standards/reso-mcp-server \
+            --include-workspace-root
+          npm run build \
+            -w @reso-standards/odata-expression-parser \
+            -w @reso-standards/reso-metadata-utils \
+            -w @reso-standards/reso-common \
+            -w @reso-standards/reso-validation \
+            -w @reso-standards/reso-client \
+            -w @reso-standards/reso-certification \
+            -w @reso-standards/reso-mcp-server \
+            --if-present
+
+      - name: Test
+        run: npm test -w @reso-standards/reso-mcp-server
+
+      - name: Scan the packed artifact for organization identifiers
+        run: node scripts/scan-pack.mjs @reso-standards/reso-mcp-server
+
+      - name: Publish (Trusted Publishing / OIDC)
+        run: npm publish -w @reso-standards/reso-mcp-server --access public

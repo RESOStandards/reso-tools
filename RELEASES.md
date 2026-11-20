@@ -2,6 +2,36 @@
 
 ---
 
+## MCP Server 0.8.0 – 2026-11-19
+
+`reso-mcp-server 0.8.0`
+
+The MCP server is published to npm and runs with one command, with nothing to clone or build:
+
+```bash
+npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env
+```
+
+In Claude Code: `claude mcp add reso -- npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env`.
+
+### Credentials from a file
+
+`--credentials <path>` reads the Web API server's address and credential from a file the user keeps, so the secret
+lives in one place outside every MCP client's configuration. A variable already set in the server's environment wins,
+and a file the server cannot read stops it with a message that names the path and never the contents. The flag is
+not `--env-file` because Node claims that name anywhere on the command line.
+
+### Install, run and documentation
+
+- The [README](reso-mcp-server/README.md) and the [User Guide](https://tools.reso.org/guides/reso-mcp-server/) start
+  from `npx`; Docker, RESO's hosted server at `services.reso.org/mcp` (beta for members) and building from source
+  follow.
+- Published from CI with provenance, like the other packages, and checked for organization identifiers before it
+  publishes.
+- Tests: 123 in the package (9 new), 3,632 across the repository.
+
+---
+
 ## Reference Server 0.9.0 and Certification 0.13.1 – 2026-11-15
 
 `reso-reference-server 0.9.0` · `odata-expression-parser 0.2.0` · `reso-certification 0.13.1`

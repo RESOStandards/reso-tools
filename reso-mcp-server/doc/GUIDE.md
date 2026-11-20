@@ -6,11 +6,27 @@ That means the MCP server can also be used to add or edit listings, maintain med
 
 ## Getting Started
 
+### Quick Start
+
+The server runs with one command, with nothing to download or build. It needs Node.js 22 or later:
+
+```
+npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env
+```
+
+An AI assistant starts it for you once it is added. In Claude Code:
+
+```
+claude mcp add reso -- npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env
+```
+
+Other assistants take the same command in their MCP settings; the [README](../README.md#claude-desktop-and-other-mcp-clients) has the configuration for each.
+
 ### Authorization
 
-Credentials never belong in a chat. 
+Credentials never belong in a chat.
 
-Create a `.env` file in the same directory as the RESO MCP Server source code:
+Create a file for them outside any project, readable only by you, for example `~/.config/reso/mcp.env`, and give its path to `--credentials`:
 
 **Bearer Token**
 ```
@@ -28,11 +44,11 @@ RESO_TOKEN_URI=https://your-server.example.com/oauth/token
 
 `RESO_BASE_URL` is important and should be verified so credentials are not exposed to the wrong server.
 
-AI assistants should never interact with authorization information directly. Additionally, keep `.env` out of version control. 
+AI assistants should never interact with authorization information directly. Additionally, keep the file out of version control. A variable already set in the server's environment wins over the file.
 
 ### Docker
 
-First, download Docker and RESO Tools, then build the image:
+Docker is the other way to run the server locally. First, download Docker and RESO Tools, then build the image:
 
 1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 2. Download the source: `git clone https://github.com/RESOStandards/reso-tools.git`
@@ -45,12 +61,14 @@ docker build -f reso-mcp-server/Dockerfile -t reso-mcp-server .
 4. Start it:
 
 ```
-docker run --rm -i --env-file .env reso-mcp-server
+docker run --rm -i --env-file ~/.config/reso/mcp.env reso-mcp-server
 ```
 
 Keep the `-i`. Without it the server exits right away and looks like it worked.
 
 Using Claude Code, Codex or another coding assistant? Ask it to do all of this for you.
+
+### Cloud
 
 RESO also hosts a cloud MCP server at `services.reso.org/mcp`, with no local installation needed. It is in beta for members. Contact **dev@reso.org** for a key, or for help with any of the above.
 
