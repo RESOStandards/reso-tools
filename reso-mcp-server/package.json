@@ -1,8 +1,22 @@
 {
   "name": "@reso-standards/reso-mcp-server",
   "version": "0.8.0",
-  "private": true,
   "description": "RESO MCP server — exposes OData query, validation, certification, and metadata tools for AI agents",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://tools.reso.org/guides/reso-mcp-server/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOStandards/reso-tools.git",
+    "directory": "reso-mcp-server"
+  },
+  "keywords": [
+    "reso",
+    "mcp",
+    "model-context-protocol",
+    "odata",
+    "real-estate",
+    "web-api"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.0.0"
@@ -11,7 +25,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "doc"
+    "doc",
+    "LICENSE"
   ],
   "bin": {
     "reso-mcp": "./dist/index.js"
@@ -36,5 +51,8 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.12"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

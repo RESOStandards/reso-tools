@@ -6,56 +6,39 @@ Works with any MCP client: Claude, Cursor, Windsurf, VS Code or your own applica
 
 > **New here?** The [User Guide](doc/GUIDE.md) walks through using the server from an AI assistant: setting up credentials, searching listings and the data attached to them, adding and editing records, and keeping another system in sync. Every number in it came from a real query against a seeded reference server, and each exchange carries the tool call and response in a collapsible block. The tool-call blocks elide the `url` argument, which every data tool requires, to keep the dialogue readable.
 
-## Install
-
-This package is **deliberately not published to npm**. It is a reference adapter meant to be read and cloned rather than installed as a dependency. See [Architecture](doc/ARCHITECTURE.md) for what it demonstrates. Build it from the [`reso-tools`](https://github.com/RESOStandards/reso-tools) monorepo:
-
-```bash
-git clone https://github.com/RESOStandards/reso-tools.git
-cd reso-tools
-npm install      # the whole workspace
-npm run build    # every package in dependency order
-```
-
-Build from the repo root rather than from this directory. Each package resolves its siblings through
-the `dist` their `package.json` points at, and a workspace symlink alone does not create that `dist`,
-so a sibling has to be built before anything that imports it.
-
-The built binary lives at `reso-tools/reso-mcp-server/dist/index.js`. Note its absolute path – you will point your MCP client at it below.
-
 ## Quick Start
 
-### Claude Code / Claude Desktop
+One command, no clone and no build. It needs Node.js 22 or later:
 
-Add to your MCP settings (`~/.claude/claude_desktop_config.json` or via `/mcp add`). Replace `/absolute/path/to/` with the directory where you cloned `reso-tools`:
+```bash
+npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env
+```
+
+An MCP client starts the server for you, so the next step is to add it to one. `--credentials` names the file that
+holds the Web API server's address and credential; see [Credentials](#credentials).
+
+### Claude Code
+
+```bash
+claude mcp add reso -- npx -y @reso-standards/reso-mcp-server --credentials ~/.config/reso/mcp.env
+```
+
+### Claude Desktop and Other MCP Clients
+
+Every client takes the same `command` and `args`. Use the file's absolute path, because a client does not expand `~`:
 
 ```json
 {
   "mcpServers": {
     "reso": {
-      "command": "node",
-      "args": ["/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js"]
+      "command": "npx",
+      "args": ["-y", "@reso-standards/reso-mcp-server", "--credentials", "/Users/you/.config/reso/mcp.env"]
     }
   }
 }
 ```
 
-Certification tools only:
-
-```json
-{
-  "mcpServers": {
-    "reso-cert": {
-      "command": "node",
-      "args": ["/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js", "--scope", "cert"]
-    }
-  }
-}
-```
-
-### Other MCP Clients
-
-The server uses stdio transport, so the configuration is the same `command` + `args` across all clients:
+Certification tools only: add `"--scope", "cert"` to `args`.
 
 - [Cursor](https://docs.cursor.com/context/model-context-protocol) – Settings > MCP Servers
 - [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers) – `.vscode/mcp.json`
@@ -63,6 +46,38 @@ The server uses stdio transport, so the configuration is the same `command` + `a
 - [JetBrains](https://www.jetbrains.com/help/idea/mcp-servers.html) – Settings > AI Assistant > MCP
 - [Zed](https://zed.dev/docs/assistant/model-context-protocol) – Settings
 - [Continue](https://docs.continue.dev/customize/model-providers/mcp), [Cline](https://github.com/cline/cline), [Amazon Q](https://docs.aws.amazon.com/amazonq/latest/qdeveloper-ug/mcp.html), [Sourcegraph Cody](https://sourcegraph.com/docs/cody/clients/mcp)
+
+### Credentials
+
+Keep the credentials in one file outside any project and out of version control, readable only by you, and point
+every client at it:
+
+```bash
+mkdir -p ~/.config/reso && touch ~/.config/reso/mcp.env && chmod 600 ~/.config/reso/mcp.env
+```
+
+A bearer token:
+
+```
+RESO_BASE_URL=https://your-server.example.com
+RESO_AUTH_TOKEN=your-token
+```
+
+Or OAuth2 client credentials:
+
+```
+RESO_BASE_URL=https://your-server.example.com
+RESO_CLIENT_ID=your-client-id
+RESO_CLIENT_SECRET=your-client-secret
+RESO_TOKEN_URI=https://your-server.example.com/oauth/token
+```
+
+The server reads the file when it starts. A variable already set in its environment wins, so the file only fills in
+what is missing. A file it cannot read stops it with a message that names the path and never the contents. The flag
+is `--credentials` rather than `--env-file` because Node claims `--env-file` anywhere on the command line. See
+[Authentication](#authentication) for the rules the server applies to the credential.
+
+## Other Ways to Run
 
 ### Docker
 
@@ -77,6 +92,38 @@ docker run -i --rm --env-file ./reso-mcp-server/.env \
 
 The `--env-file` is not optional. The image sets no credential defaults, so without it every data
 call refuses with the authentication message above.
+
+### Cloud
+
+RESO also hosts the MCP server at `services.reso.org/mcp`, with nothing to install. It is in beta for members:
+contact **dev@reso.org** for a key.
+
+### From Source
+
+For working on the server itself, build it from the [`reso-tools`](https://github.com/RESOStandards/reso-tools)
+monorepo:
+
+```bash
+git clone https://github.com/RESOStandards/reso-tools.git
+cd reso-tools
+npm install      # the whole workspace
+npm run build    # every package in dependency order
+```
+
+Build from the repo root rather than from this directory. Each package resolves its siblings through the `dist`
+their `package.json` points at, and a workspace symlink alone does not create that `dist`, so a sibling has to be
+built before anything that imports it. Then point a client at the build:
+
+```json
+{
+  "mcpServers": {
+    "reso": {
+      "command": "node",
+      "args": ["/absolute/path/to/reso-tools/reso-mcp-server/dist/index.js", "--credentials", "/Users/you/.config/reso/mcp.env"]
+    }
+  }
+}
+```
 
 ## Tools
 
@@ -210,7 +257,7 @@ credentials wins over a bearer token:
 | OAuth2 client credentials | `RESO_CLIENT_ID`, `RESO_CLIENT_SECRET`, `RESO_TOKEN_URI`, optional `RESO_SCOPE` |
 
 `RESO_BASE_URL` is required alongside either, and binds the credential to one server. See
-[Install](#install) for the `--env-file` wiring and [Architecture](doc/ARCHITECTURE.md)
+[Credentials](#credentials) for giving the server the file and [Architecture](doc/ARCHITECTURE.md)
 in the User Guide for the full rules.
 
 Two behaviors worth knowing before you debug something:

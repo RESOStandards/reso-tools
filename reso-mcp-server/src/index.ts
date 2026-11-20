@@ -7,6 +7,7 @@
  *   reso-mcp                     # all tools
  *   reso-mcp --scope cert        # certification tools only
  *   reso-cert mcp                # alias for --scope cert
+ *   reso-mcp --credentials <path>  # read credentials from a file (see env-file.ts)
  */
 
 /// <reference types="node" />
@@ -14,6 +15,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { envFileFailureMessage, loadEnvFileFrom } from './env-file.js';
 import { handlers } from './handlers.js';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { type ToolScope, toolsForScope } from './tools.js';
@@ -66,6 +68,13 @@ const jsonSchemaToZodShape = (schema: Record<string, unknown>): Record<string, z
 
   return shape;
 };
+
+// `--credentials <path>` first, so the credentials are in place before any tool reads the environment.
+const envFile = loadEnvFileFrom(process.argv);
+if (envFile.kind === 'failed') {
+  process.stderr.write(`${envFileFailureMessage(envFile)}\n`);
+  process.exit(1);
+}
 
 const scope = parseScope();
 const tools = toolsForScope(scope);
