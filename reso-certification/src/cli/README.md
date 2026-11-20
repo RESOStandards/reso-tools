@@ -56,7 +56,7 @@ environment a command will write to, look at the host in `TOKEN_URI`.
 | `TOKEN_URI` | the same commands, `archive-report` and `ask` | OAuth2 token endpoint. **This is what selects QA versus production.** `archive-report` also reads the Cert API host off it. |
 | `CLIENT_ID`, `CLIENT_SECRET` | the same commands, `restore`, `archive-report` and `ask` | OAuth2 client credentials the token is minted from. `restore` and `archive-report` send `CLIENT_SECRET` only to the token endpoint of the Cert API they call, and present the token it returns. |
 | `CERT_API_TOKEN` | `restore`, `archive-report` and `ask` | A bearer token for the Cert API, used as it is instead of minting one. Set it in the environment or the `.env`; there is no flag, so it never lands in shell history. |
-| `RESO_ASSISTANT_ORIGIN` | `ask` | Where RESO's Assistant answers. The Assistant is in a closed beta, and its address comes with access. `--origin` overrides it. |
+| `RESO_ASSISTANT_ORIGIN` | `ask` and `shell` | Where RESO's Assistant answers. The Assistant is in a closed beta, and its address comes with access. `--origin` overrides it. |
 | `FT_ADMIN_SECRET` | `update-variations --fast-track` | Fast Track admin credential. A fast-track submission is refused without it, before any request is made. |
 | `CERT_AUTH_API_BASE_URL`, `CERT_AUTH_API_USERNAME`, `CERTIFICATION_API_KEY`, `CURRENT_PROVIDER_UOI` | the SDK's provider-token fallback, and `CERTIFICATION_API_KEY` by `restore` and `archive-report` when neither `CERT_API_TOKEN` nor the client credentials are set | The second auth path, used when the OAuth2 variables are absent. |
 | `RESO_VARIATIONS_HANDLER` | the variations step of `dd`, `find-variations` and `rcf` | For a host that runs the SDK: the path of a module whose `computeVariations` computes variations in place of the Variations Service, so no service address or token is needed. Unset, the service is called as usual. See the [package README](https://tools.reso.org/packages/reso-certification/#computing-variations-with-your-own-module). |
@@ -97,6 +97,7 @@ different thing from the RESO service credentials above.
 | [`restore`](#restore) | Restore to a Cert API: a run's stored results, published as the run would have, or a certification server backup (admin) |
 | [`archive-report`](#archive-report) | Archive a certification report, with the site's warning first, and only with `--confirm` |
 | [`ask`](#ask) | Ask RESO's Assistant a question, as yourself (closed beta) |
+| [`shell`](#shell) | Sign in with a code emailed to you, then ask the Assistant questions with follow-ups (closed beta) |
 | [`analytics compare`](#analytics-compare) | Compare a Data Dictionary run with the run before it: what changed, by how much, better or worse |
 
 The first four are **endorsement runners** (a full compliance pipeline against a live
@@ -656,6 +657,54 @@ reso-cert ask --json "What is the format of the variations report?"
 - **Nothing is sent** without an address for the Assistant and a credential.
 - **Exit codes:** 0 answered; 1 the Assistant did not accept the credential, or does not admit the account; 2 anything
   else.
+
+### `shell`
+
+Sign in with the code emailed to you, then ask RESO's Assistant questions, with follow-ups read in the context of the
+answers before them. No credentials file is needed: you sign in as yourself, the way you sign in to the certification
+site.
+
+```bash
+reso-cert shell
+reso-cert shell --email you@example.com
+```
+
+```text
+Email: you@example.com
+If you@example.com can sign in to certification.reso.org, a code is on its way to it.
+Code: 123456
+Signed in as you@example.com.
+Questions to the Assistant are available.
+Type a question, or /help. /exit signs out.
+reso> What changed in Data Dictionary 2.1?
+reso> Which of those are on the Property resource?
+reso> /exit
+Signed out.
+```
+
+| Option | Meaning |
+|---|---|
+| `--email <address>` | The address you sign in to certification.reso.org with. Asked for when not given. |
+| `--origin <url>` | Where the Assistant answers. Default: `RESO_ASSISTANT_ORIGIN`, in the environment or the `.env`. |
+| `--url <url>` | The Cert API to sign in at. Default: `https://cert-api.reso.org`. |
+
+| In the shell | Does |
+|---|---|
+| a question | Asks the Assistant, with the last few answered questions so a follow-up is understood |
+| `/new` | Starts a new conversation |
+| `/whoami` | Who is signed in, and whether questions are available |
+| `/help` | The list |
+| `/exit` | Signs out and leaves. `exit`, `quit`, Ctrl-D and Ctrl-C sign out too |
+
+- **Who can sign in:** anyone who can sign in to certification.reso.org. **Who can ask:** the people the desktop app
+  admits. Before each question the shell asks the Cert API whether questions are available to you, and when they are
+  not, it says why in the Cert API's words and sends nothing.
+- **The sign-in lives in memory only.** It is never written to disk and never printed, and it is revoked at the Cert
+  API when the shell ends, however it ends. Ctrl-C stops a question under way and signs out.
+- **Answers** go to stdout. Prompts, progress and notices go to stderr.
+- **Nothing is sent** without an address for the Assistant: the shell stops before asking for a code.
+- **Exit codes:** 0 signed out and left; 1 the sign-in was not completed (no address, no code, or three codes that did
+  not work); 2 anything else.
 
 ## RESO Analytics
 

@@ -110,8 +110,9 @@ import { readLedger, runRestore } from './restore-command.js';
 import { findStoredRuns, runRunRestore } from './restore-runs.js';
 import { formatResultJson } from './result-json.js';
 import { generateSchemaFromReport, loadSettings, validateSchemaPayload } from './schema-command.js';
-import { maskSecrets } from './secrets.js';
+import { maskSecrets, registerSecret } from './secrets.js';
 import { addAuthOptions, addOutputOptions } from './shared-options.js';
+import { runShellCommand } from './shell-command.js';
 import {
   duplicateVariationKeys,
   formatEndorsementStatusTable,
@@ -2375,6 +2376,31 @@ program
       console.error('Error:', maskSecrets(error instanceof Error ? error.message : String(error)));
       process.exitCode = askExitCode(error);
     }
+  });
+
+// Signing in with the code emailed to you, then asking the Assistant with follow-ups. Anyone who can sign in to
+// certification.reso.org can sign in; asking is for the people the desktop app admits. The session lives in memory
+// and is revoked when the shell ends.
+program
+  .command('shell')
+  .description(
+    "Sign in with a code emailed to you, then ask RESO's Assistant questions with follow-ups. " +
+      'Anyone who can sign in to certification.reso.org can sign in; asking needs member access. ' +
+      'Exit code 0 after signing out, 1 when sign-in was not completed, 2 on any other error.'
+  )
+  .option('--email <address>', 'The address you sign in to certification.reso.org with. Asked for when not given.')
+  .option('--url <url>', 'The Cert API origin to sign in at. Default: https://cert-api.reso.org')
+  .option('--origin <url>', 'Where the Assistant answers. Default: RESO_ASSISTANT_ORIGIN.')
+  .action(async (opts: { email?: string; url?: string; origin?: string }) => {
+    process.exitCode = await runShellCommand({
+      ...(opts.email === undefined ? {} : { email: opts.email }),
+      ...(opts.url === undefined ? {} : { url: opts.url }),
+      ...(opts.origin === undefined ? {} : { origin: opts.origin }),
+      mask: maskSecrets,
+      onSecret: value => {
+        registerSecret(value);
+      }
+    });
   });
 
 // RESO Analytics: what a provider's runs show over time. Read-only, from run directories on disk; nothing is sent.

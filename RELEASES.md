@@ -2,6 +2,17 @@
 
 ---
 
+## Unreleased
+
+### Sign in from the command line and ask the Assistant
+
+- **`reso-cert shell`** signs you in with the code emailed to you, the way you sign in to certification.reso.org, then
+  takes questions for RESO's Assistant one after another, sending each follow-up with the answers before it. No
+  `credentials.env` is needed.
+- Anyone who can sign in to the certification site can sign in. Asking is for the people the desktop app admits: the
+  shell checks before each question and, when questions are not available, says why and sends nothing.
+- The sign-in is held in memory only and is revoked when the shell ends: `/exit`, Ctrl-D or Ctrl-C.
+
 ## MCP Server 0.8.0 – 2026-11-19
 
 `reso-mcp-server 0.8.0`

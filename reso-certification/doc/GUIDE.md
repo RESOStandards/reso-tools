@@ -667,6 +667,19 @@ sources it drew on. `--json` prints the same as one object for scripts. The Assi
 address comes with access; to ask for access, write to dev+assistant@reso.org. See
 [`ask`](https://tools.reso.org/packages/reso-certification/cli/#ask) in the CLI reference for every option.
 
+To ask a run of questions without a `credentials.env`, sign in as yourself with the code emailed to you:
+
+```bash
+reso-cert shell
+```
+
+The shell asks for the address you sign in to certification.reso.org with, then the code, and then takes questions
+one after another, so a follow-up such as "and on the Property resource?" is understood. Anyone who can sign in to the
+certification site can sign in here; asking is for the people the desktop app admits, and the shell says so before
+sending anything if you are not one of them. The sign-in is held in memory only and is revoked when you leave with
+`/exit`, Ctrl-D or Ctrl-C. See [`shell`](https://tools.reso.org/packages/reso-certification/cli/#shell) in the CLI
+reference.
+
 ## Comparing a Run with the One Before
 
 Each Data Dictionary run writes its reports to `…/current`, and the run before it moves to `…/archived/<timestamp>`.
