@@ -193,6 +193,16 @@ export interface PreparedVariations {
  */
 const emptyMap = <T>(): Record<string, T> => Object.create(null) as Record<string, T>;
 
+/** The fields that identify a suggested target. A suggestion repeats another only when every one of them is equal. */
+const TARGET_IDENTITY_FIELDS = [
+  'suggestedResourceName',
+  'suggestedFieldName',
+  'suggestedLookupValue',
+  'suggestedLegacyODataValue'
+] as const;
+
+const isSameTarget = (a: Json, b: Json): boolean => TARGET_IDENTITY_FIELDS.every(field => a?.[field] === b?.[field]);
+
 const groupByResourceAndField = (records: ReadonlyArray<Json>, level: ElementEntry['level']): ElementEntry[] =>
   Object.values(
     records.reduce<Record<string, Record<string, ElementEntry>>>((acc, { resourceName, fieldName, ...suggestion }) => {
@@ -255,14 +265,12 @@ export const prepareResults = ({
             };
           }
 
+          // A duplicate is the same target: the same resource, field and value. Two fields can share one lookup
+          // (CurrentUse and PossibleUse), and two resources can share one field name (Property.RoomType and
+          // PropertyRooms.RoomType), so a value alone does not identify a target. Keying on it showed a provider
+          // one of two targets a decision allows.
           const suggestions = acc[rKey][fKey][lookupKey].suggestions;
-          if (
-            !suggestions.some(
-              x =>
-                (x as Json)?.suggestedLookupValue === (rest as Json)?.suggestedLookupValue &&
-                (x as Json)?.suggestedLegacyODataValue === (rest as Json)?.suggestedLegacyODataValue
-            )
-          ) {
+          if (!suggestions.some(x => isSameTarget(x as Json, rest as Json))) {
             suggestions.push({ ...rest });
           }
 
