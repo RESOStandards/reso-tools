@@ -94,4 +94,21 @@ describe('matching helpers', () => {
     expect(targetsOf('Game Room')).toEqual(['PropertyRooms.RoomType', 'Property.RoomType']);
     expect(targetsOf('Recreation')).toEqual(['Property.CurrentUse', 'Property.PossibleUse']); // the repeat collapses
   });
+
+  it('prepareResults keeps mappings that share a target but relate to different elements', () => {
+    const farm = (suggestedRelatedLookupValue: string) => ({
+      resourceName: 'Property',
+      fieldName: 'PropertySubType',
+      lookupValue: 'Hobby Farm',
+      suggestedResourceName: 'Property',
+      suggestedFieldName: 'PropertySubType',
+      suggestedLookupValue: 'Farm',
+      suggestedRelatedResourceName: 'Property',
+      suggestedRelatedFieldName: 'PropertyType',
+      suggestedRelatedLookupValue
+    });
+    const out = prepareResults({ lookupValues: [farm('Farm'), farm('Land'), farm('Land')] });
+    expect(out.lookups).toHaveLength(1);
+    expect(out.lookups[0].suggestions.map(s => s.suggestedRelatedLookupValue)).toEqual(['Farm', 'Land']); // the repeat collapses
+  });
 });
