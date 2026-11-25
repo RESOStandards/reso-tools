@@ -66,5 +66,49 @@ describe('matching helpers', () => {
     expect(out.resources).toHaveLength(1);
     expect(out.fields).toHaveLength(1);
     expect(out.lookups).toHaveLength(1); // two identical legacyOData entries → one grouped lookup
+    expect(out.lookups[0].suggestions).toHaveLength(1); // ...carrying the one target once
+  });
+
+  it('prepareResults keeps targets that share a value but differ in field or resource', () => {
+    const lookupValue = (suggestedResourceName: string, suggestedFieldName: string, suggestedLookupValue: string) => ({
+      resourceName: 'Property',
+      fieldName: 'InteriorFeatures',
+      lookupValue: 'Game Room',
+      suggestedResourceName,
+      suggestedFieldName,
+      suggestedLookupValue
+    });
+    const out = prepareResults({
+      lookupValues: [
+        lookupValue('PropertyRooms', 'RoomType', 'Game Room'),
+        lookupValue('Property', 'RoomType', 'Game Room'),
+        { ...lookupValue('Property', 'CurrentUse', 'Recreational'), lookupValue: 'Recreation', fieldName: 'PropertySubType' },
+        { ...lookupValue('Property', 'PossibleUse', 'Recreational'), lookupValue: 'Recreation', fieldName: 'PropertySubType' },
+        { ...lookupValue('Property', 'PossibleUse', 'Recreational'), lookupValue: 'Recreation', fieldName: 'PropertySubType' }
+      ]
+    });
+    const targetsOf = (localValue: string) =>
+      out.lookups
+        .filter(item => item.lookupValue === localValue)
+        .flatMap(item => item.suggestions.map(s => `${s.suggestedResourceName}.${s.suggestedFieldName}`));
+    expect(targetsOf('Game Room')).toEqual(['PropertyRooms.RoomType', 'Property.RoomType']);
+    expect(targetsOf('Recreation')).toEqual(['Property.CurrentUse', 'Property.PossibleUse']); // the repeat collapses
+  });
+
+  it('prepareResults keeps mappings that share a target but relate to different elements', () => {
+    const farm = (suggestedRelatedLookupValue: string) => ({
+      resourceName: 'Property',
+      fieldName: 'PropertySubType',
+      lookupValue: 'Hobby Farm',
+      suggestedResourceName: 'Property',
+      suggestedFieldName: 'PropertySubType',
+      suggestedLookupValue: 'Farm',
+      suggestedRelatedResourceName: 'Property',
+      suggestedRelatedFieldName: 'PropertyType',
+      suggestedRelatedLookupValue
+    });
+    const out = prepareResults({ lookupValues: [farm('Farm'), farm('Land'), farm('Land')] });
+    expect(out.lookups).toHaveLength(1);
+    expect(out.lookups[0].suggestions.map(s => s.suggestedRelatedLookupValue)).toEqual(['Farm', 'Land']); // the repeat collapses
   });
 });
