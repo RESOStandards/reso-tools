@@ -332,7 +332,7 @@ The server registers the `EntityEvent` resource, starts producing change events 
 
 ```bash
 # Get every event since sequence 0
-curl 'http://localhost:8080/EntityEvent?$filter=Sequence ge 0&$orderby=Sequence asc&$top=100'
+curl 'http://localhost:8080/EntityEvent?$filter=EntityEventSequence ge 0&$orderby=EntityEventSequence asc&$top=100'
 
 # Get only Property changes
 curl 'http://localhost:8080/EntityEvent?$filter=ResourceName eq %27Property%27'
